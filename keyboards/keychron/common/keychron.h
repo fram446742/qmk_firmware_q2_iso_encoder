@@ -14,21 +14,34 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#pragma once
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
-}
+#include "quantum.h"
+#include "keychron_common.h"
+#include "keychron_task.h"
+#include "backlit_indicator.h"
+
+#ifdef LANGUAGE_ENABLE
+#    include "language.h"
 #endif
 
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}
+#if defined(SNAP_CLICK_ENABLE) && !defined(ANANLOG_MATRIX)
+#    include "snap_click.h"
+#endif
+
+#ifdef ANALOG_MATRIX_ENABLE
+#    include "analog_matrix.h"
+#    include "profile.h"
+#endif
+
+#if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+#    include "wireless_include.h"
+#endif
+
+#ifdef STATE_NOTIFY_ENABLE
+#    include "state_notify.h"
+#endif
+
+#ifdef FACTORY_TEST_ENABLE
+#    include "factory_test.h"
+#endif

@@ -1,4 +1,4 @@
-/* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+/* Copyright 2024 ~ 2025 @ Keychron (https://www.keychron.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,21 +14,25 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#include "rgb_matrix_kb_config.h"
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+
+RGB_MATRIX_EFFECT(PER_KEY_RGB)
+RGB_MATRIX_EFFECT(MIXED_RGB)
+
+#    ifdef RGB_MATRIX_CUSTOM_EFFECT_IMPLS
+
+bool PER_KEY_RGB(effect_params_t *params) {
+    extern bool per_key_rgb(effect_params_t * params);
+    return per_key_rgb(params);
 }
+
+bool MIXED_RGB(effect_params_t *params) {
+    extern bool mixed_rgb(effect_params_t * params);
+    return mixed_rgb(params);
+}
+
+#    endif
+
 #endif
-
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}

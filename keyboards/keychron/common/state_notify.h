@@ -14,21 +14,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#pragma once
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
-}
+#include <stdint.h>
+
+void factory_reset_nofity(void);
+#ifdef USB_REPORT_INTERVAL_ENABLE
+void usb_report_rate_notify(uint8_t report_rate_div);
 #endif
-
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}

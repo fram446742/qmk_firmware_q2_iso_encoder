@@ -1,4 +1,4 @@
-/* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+/* Copyright 2025 @ Keychron (https://www.keychron.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,21 +14,25 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#pragma once
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
-}
-#endif
+#include "keycodes.h"
 
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}
+enum custom_keycodes {
+    KC_LOPTN = QK_KB_2,
+    KC_ROPTN,
+    KC_LCMMD,
+    KC_RCMMD,
+    KC_MAC_SIRI,
+    KC_WIN_TASK_VIEW,
+    KC_WIN_FILE_EXPLORER,
+    KC_MAC_SCREEN_SHOT,
+    KC_WIN_CORTANA,
+    NEW_SAFE_RANGE,
+};
+
+#define KC_SIRI KC_MAC_SIRI
+#define KC_TASK KC_WIN_TASK_VIEW
+#define KC_FILE KC_WIN_FILE_EXPLORER
+#define KC_SNAP KC_MAC_SCREEN_SHOT
+#define KC_CTANA KC_WIN_CORTANA

@@ -1,4 +1,4 @@
-/* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+/* Copyright 2024 ~ 2025 @ Keychron (https://www.keychron.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,21 +14,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#pragma once
+#include "stdint.h"
+#include "action.h"
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
-}
-#endif
+void retail_demo_start(void);
+void retail_demo_stop(void);
 
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}
+bool process_record_retail_demo(uint16_t keycode, keyrecord_t* record);
+void retail_demo_task(void);

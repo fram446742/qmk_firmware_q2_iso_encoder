@@ -1,4 +1,4 @@
-/* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+/* Copyright 2022 ~ 2025 @ lokher (https://www.keychron.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,21 +14,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#pragma once
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
-        }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
-    }
-    return true;
-}
+void factory_test_init(void);
+#if defined(LED_MATRIX_ENABLE) || defined(RGB_MATRIX_ENABLE)
+bool factory_test_indicator(void);
 #endif
+void factory_reset(void);
+bool factory_reset_indicating(void);
+void factory_test_task(void);
+void factory_test_rx(bool usb, uint8_t *data, uint8_t length);
 
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
-}
+bool process_record_factory_test(uint16_t keycode, keyrecord_t *record);
