@@ -205,8 +205,9 @@ make keychron/q2/iso_encoder:keychron:flash
 |-------|------|----------|
 | `default` | 50,416 B | Matrix, RGB, basic QMK |
 | `via` | 56,964 B | VIA + Keychron common infra |
-| `keychron` | 56,964 B | Keychron Launcher + VIA + custom RGB |
-| `vial` | TBD | Vial + VialRGB + Keychron common infra |
+| `keychron` | 57,104 B | Keychron Launcher + VIA (replaces old `via`) |
+| `vial` | 57,104 B | Keychron Launcher + VIA + Vial |
+| `default` | 50,548 B | Plain QMK (KEYCHRON_ENABLE=no) |
 
 ---
 

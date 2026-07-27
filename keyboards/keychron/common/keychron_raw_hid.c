@@ -43,6 +43,9 @@
 #    endif
 #endif
 
+// Forward declaration
+void keychron_notify_set_active(bool active);
+
 #ifdef RAW_ENABLE
 extern void dfu_info_rx(uint8_t *data, uint8_t length);
 extern void nkro_rx(uint8_t *data, uint8_t length);
@@ -118,6 +121,13 @@ void kc_raw_hid_send(uint8_t *data, uint8_t len) {
 }
 
 bool kc_raw_hid_rx(uint8_t *data, uint8_t length) {
+    // Detect Keychron Launcher (0xA0-0xAB) vs VIA/Vial (0x01-0x0E)
+    if (data[0] >= 0xA0 && data[0] <= 0xAB) {
+        keychron_notify_set_active(true);
+    } else if (data[0] <= 0x0F) {
+        keychron_notify_set_active(false);
+    }
+
 #    if defined(ANANLOG_MATRIX) && defined(VIA_ENABLE)
     if (data[0] == id_get_keyboard_value && data[1] == id_switch_matrix_state) {
         send_analog_matrix(data, length);
@@ -257,7 +267,7 @@ bool kc_raw_hid_rx(uint8_t *data, uint8_t length) {
 
 #    if defined(VIA_ENABLE)
 /* Override via_command_kb — called from via.c raw_hid_receive */
-__attribute__((weak)) bool via_command_kb(uint8_t *data, uint8_t length) {
+bool via_command_kb(uint8_t *data, uint8_t length) {
     return kc_raw_hid_rx(data, length);
 }
 #    else

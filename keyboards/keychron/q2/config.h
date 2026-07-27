@@ -16,13 +16,16 @@
 
 #pragma once
 
-#include "eeconfig_kb.h"
+#ifdef KEYCHRON_ENABLE
+#    include "eeconfig_kb.h"
+#endif
 
 #ifdef RGB_MATRIX_ENABLE
 /* RGB Matrix Driver Configuration */
 #define SNLED27351_I2C_ADDRESS_1 SNLED27351_I2C_ADDRESS_VDDIO
 #define SNLED27351_I2C_ADDRESS_2 SNLED27351_I2C_ADDRESS_GND
 
+#ifdef KEYCHRON_ENABLE
 /* Increase I2C speed to 1000 KHz */
 #define I2C1_TIMINGR_PRESC 0U
 #define I2C1_TIMINGR_SCLDEL 3U
@@ -35,12 +38,15 @@
 #define SNLED27351_CURRENT_TUNE  \
     { 0xC0, 0xC0, 0x5D, 0xC0, 0xC0, 0x5D, 0xC0, 0xC0, 0x5D, 0xC0, 0xC0, 0x5D }
 #endif
+#endif
 
-#define CUSTOM_KEYCODES_ENABLE
+#ifdef KEYCHRON_ENABLE
+#    define CUSTOM_KEYCODES_ENABLE
 
-#define MATRIX_UNSELECT_DRIVE_HIGH
+#    define MATRIX_UNSELECT_DRIVE_HIGH
 
 /* Factory test keys */
-#define FN_KEY_1 MO(2)
-#define FN_KEY_2 MO(3)
-#define FN_KEY_3 MO(4)
+#    define FN_KEY_1 MO(2)
+#    define FN_KEY_2 MO(3)
+#    define FN_KEY_3 MO(4)
+#endif
