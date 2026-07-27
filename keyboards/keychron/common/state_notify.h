@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 void factory_reset_nofity(void);
+void keychron_notify_set_active(bool active);
 #ifdef USB_REPORT_INTERVAL_ENABLE
 void usb_report_rate_notify(uint8_t report_rate_div);
 #endif

@@ -12,6 +12,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * NOTE: Async layer notifications are only sent when the Keychron Launcher
+ * is active (detected by 0xA0-0xAB commands). VIA/Vial use 0x01-0x0E
+ * commands and don't trigger notifications, avoiding protocol collision.
  */
 
 #include "quantum.h"
@@ -19,7 +23,17 @@
 #include "raw_hid.h"
 #include "usb_descriptor.h"
 
+// Only send notifications when Launcher is actively communicating
+static bool launcher_active = false;
+
+void keychron_notify_set_active(bool active) {
+    launcher_active = active;
+}
+
 static void layer_changed_nofity(layer_state_t default_layer, layer_state_t layer) {
+    if (!launcher_active) return;
+    if (!is_keyboard_master()) return;
+
 #ifdef RAW_ENABLE
     uint8_t buf[RAW_EPSIZE] = {0};
 
@@ -41,6 +55,8 @@ layer_state_t layer_state_set_kb(layer_state_t state) {
 }
 
 void factory_reset_nofity(void) {
+    if (!launcher_active) return;
+
 #ifdef RAW_ENABLE
     uint8_t buf[RAW_EPSIZE] = {0};
 
@@ -53,6 +69,8 @@ void factory_reset_nofity(void) {
 
 #ifdef USB_REPORT_INTERVAL_ENABLE
 void usb_report_rate_notify(uint8_t report_rate_div) {
+    if (!launcher_active) return;
+
 #    ifdef RAW_ENABLE
     uint8_t buf[RAW_EPSIZE] = {0};
 
