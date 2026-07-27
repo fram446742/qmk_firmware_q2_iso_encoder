@@ -20,9 +20,9 @@
 
 #if DEBOUNCE > 0
 
-void debounce_init(void) {}
+void debounce_init(uint8_t num_rows) {}
 
-bool debounce(matrix_row_t raw[], matrix_row_t cooked[], bool changed) {
+bool debounce(matrix_row_t raw[], matrix_row_t cooked[], uint8_t num_rows, bool changed) {
     static fast_timer_t debouncing_time;
     static bool         debouncing     = false;
     bool                cooked_changed = false;
@@ -45,3 +45,5 @@ bool debounce(matrix_row_t raw[], matrix_row_t cooked[], bool changed) {
 #else // no debouncing.
 #    include "none.c"
 #endif
+
+__attribute__((weak)) void debounce_free(void) {}
