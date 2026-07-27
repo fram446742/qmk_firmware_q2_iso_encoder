@@ -24,6 +24,10 @@
         "rows": ["B4", "B3", "A15", "A14", "A13"]
     },
     "diode_direction": "ROW2COL",
+    "build": {
+        "debounce_type": "custom"
+    },
+    "debounce": 50,
     "eeprom": {
         "wear_leveling": {
             "driver": "embedded_flash",

@@ -303,7 +303,7 @@ void matrix_init(void) {
     memset(matrix, 0, sizeof(matrix));
     memset(raw_matrix, 0, sizeof(raw_matrix));
 
-    debounce_init();
+    debounce_init(MATRIX_ROWS);
 
     matrix_init_kb();
 }
@@ -336,9 +336,9 @@ uint8_t matrix_scan(void) {
     if (changed) memcpy(raw_matrix, curr_matrix, sizeof(curr_matrix));
 
 #ifdef SPLIT_KEYBOARD
-    changed = debounce(raw_matrix, matrix + thisHand, changed) | matrix_post_scan();
+    changed = debounce(raw_matrix, matrix + thisHand, MATRIX_ROWS, changed) | matrix_post_scan();
 #else
-    changed = debounce(raw_matrix, matrix, changed);
+    changed = debounce(raw_matrix, matrix, MATRIX_ROWS, changed);
     matrix_scan_kb();
 #endif
     return (uint8_t)changed;
