@@ -1,4 +1,5 @@
-/* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+/* Copyright 2021 Simon Arlott
+ * Copyright 2024 ~ 2025 @ keychron (https://www.keychron.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,21 +15,23 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "keychron.h"
+#include "debounce.h"
+#include <string.h>
 
-#ifdef DIP_SWITCH_ENABLE
-bool dip_switch_update_kb(uint8_t index, bool active) {
-    if (!dip_switch_update_user(index, active)) {
-         return false;
+void none_debounce_init(uint8_t num_rows) {}
+
+bool none_debounce(matrix_row_t raw[], matrix_row_t cooked[], uint8_t num_rows, bool changed) {
+    bool cooked_changed = false;
+
+    if (changed) {
+        size_t matrix_size = num_rows * sizeof(matrix_row_t);
+        if (memcmp(cooked, raw, matrix_size) != 0) {
+            memcpy(cooked, raw, matrix_size);
+            cooked_changed = true;
         }
-    if (index == 0) {
-        default_layer_set(1UL << (active ? 1 : 0));
     }
-    return true;
-}
-#endif
 
-void keyboard_post_init_kb(void) {
-    keychron_common_init();
-    keyboard_post_init_user();
+    return cooked_changed;
 }
+
+void none_debounce_free(void) {}
