@@ -32,6 +32,7 @@
 #include "config.h"
 
 #if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+uint8_t rgb_regions[RGB_MATRIX_LED_COUNT];
 
 #    define PER_KEY_RGB_VER 0x0001
 
