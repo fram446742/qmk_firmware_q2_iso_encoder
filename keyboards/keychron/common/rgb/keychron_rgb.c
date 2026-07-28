@@ -91,6 +91,10 @@ void eeconfig_reset_custom_rgb(void) {
     memcpy(regions, default_region, RGB_MATRIX_LED_COUNT);
     eeprom_update_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
 
+    memcpy(rgb_regions, default_region, RGB_MATRIX_LED_COUNT);
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
+        g_led_config.flags[i] = (g_led_config.flags[i] & 0x0F) | (default_region[i] << 4);
+
     memset(effect_list, 0, sizeof(effect_list));
 
     effect_list[0][0].effect = 5;
