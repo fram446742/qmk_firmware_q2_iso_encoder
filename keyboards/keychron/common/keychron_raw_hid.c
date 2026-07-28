@@ -17,6 +17,7 @@
  */
 
 #include QMK_KEYBOARD_H
+#include <string.h>
 #include "keychron_common.h"
 #include "keychron_raw_hid.h"
 #include "raw_hid.h"
@@ -145,7 +146,7 @@ bool kc_raw_hid_rx(uint8_t *data, uint8_t length) {
             data[7] = DEVICE_VER >> 8;
             data[8] = DEVICE_VER & 0xFF;
             return false;
-#    endif
+#endif
         case KC_GET_PROTOCOL_VERSION:
             data[1] = PROTOCOL_VERSION;
             data[2] = 0;
