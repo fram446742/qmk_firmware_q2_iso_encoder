@@ -12,13 +12,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- *
- * NOTE: Adapted for upstream QMK (wired-only, no wireless/ChibiOS usb_main.h).
  */
 
 #include "quantum.h"
 #include "eeconfig.h"
 #include "config.h"
+#include "usb_main.h"
 #include "eeprom.h"
 #include "nvm_eeprom_eeconfig_internal.h"
 #ifdef LED_MATRIX_ENABLE
@@ -30,7 +29,6 @@
 #include "keychron_common.h"
 #include "keychron_task.h"
 #include "backlit_indicator.h"
-
 #if defined(LED_MATRIX_ENABLE) || defined(RGB_MATRIX_ENABLE)
 
 typedef struct {
@@ -67,6 +65,10 @@ void indicator_eeconfig_reload(void) {
 }
 
 __attribute__((weak)) void os_state_indicate(void) {
+#    if defined(RGB_MATRIX_SLEEP) || defined(LED_MATRIX_SLEEP)
+    if (USB_DRIVER.state == USB_SUSPENDED) return;
+#    endif
+
 #    if defined(NUM_LOCK_INDEX)
     if (host_keyboard_led_state().num_lock) {
 #        if defined(DIM_NUM_LOCK)
@@ -102,7 +104,7 @@ __attribute__((weak)) void os_state_indicate(void) {
 #    endif
 
 #    if defined(WINLOCK_LED_LIST) || defined(WIN_LOCK_LED_PIN)
-    {
+    if (get_transport() == TRANSPORT_USB) {
 #        ifdef WIN_BASE_LAYER
         if (get_highest_layer(default_layer_state) == WIN_BASE_LAYER)
 #        endif
@@ -240,6 +242,7 @@ void suspend_wakeup_init_kb(void) {
             SET_LED_OFF(idx_list[i]);
 #    else
 #        if defined(RGB_MATRIX_ENABLE)
+            // Only rgb matrix is support
             rgb_matrix_set_color(i, 255, 0, 0);
 #        endif
 #    endif
