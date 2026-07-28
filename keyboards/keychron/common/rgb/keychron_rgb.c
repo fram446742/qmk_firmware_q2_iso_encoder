@@ -126,6 +126,9 @@ void eeconfig_init_custom_rgb(void) {
     // Load mixed rgb
     eeprom_read_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
     eeprom_read_block(effect_list, OFFSET_EFFECT_LIST, sizeof(effect_list));
+    /* Mirror regions into rgb_regions so the per-key RGB effect has
+     * valid region data even before the Vial/Launcher app pushes HID. */
+    memcpy(rgb_regions, regions, sizeof(rgb_regions));
     update_mixed_rgb_effect_count();
 }
 
