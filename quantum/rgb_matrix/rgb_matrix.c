@@ -202,14 +202,14 @@ void rgb_matrix_set_color_all(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 void rgb_matrix_region_set_color(uint8_t region, int index, uint8_t red, uint8_t green, uint8_t blue) {
-    if ((g_led_config.flags[index] & 0xF0) >> 4 == region) {
+    if (rgb_regions[index] == region) {
         rgb_matrix_driver.set_color(index, red, green, blue);
     }
 }
 
 void rgb_matrix_region_set_color_all(uint8_t region, uint8_t red, uint8_t green, uint8_t blue) {
     for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
-        if (((g_led_config.flags[i] & 0xF0) >> 4) == region)
+        if (rgb_regions[i] == region)
             rgb_matrix_set_color(i, red, green, blue);
 }
 
