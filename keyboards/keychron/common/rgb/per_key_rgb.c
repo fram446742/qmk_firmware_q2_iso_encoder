@@ -17,7 +17,6 @@
 #include "quantum.h"
 #include "rgb_matrix.h"
 #include "keychron_rgb_type.h"
-#include "rgb_matrix_extensions.h"
 #include <math.h>
 #include <lib/lib8tion/lib8tion.h>
 
