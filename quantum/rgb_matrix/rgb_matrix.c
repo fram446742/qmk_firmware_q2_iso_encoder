@@ -60,13 +60,12 @@ __attribute__((weak)) rgb_t rgb_matrix_hsv_to_rgb(hsv_t hsv) {
 #undef RGB_MATRIX_CUSTOM_EFFECT_IMPLS
 #undef RGB_MATRIX_EFFECT
 // -----End rgb effect includes macros-------
-// ------------------------------------------
-
 // Non-static effect wrappers for custom keyboard code (mixed_rgb.c, per_key_rgb.c)
 #define RGB_MATRIX_EFFECT(name, ...) \
     __attribute__((unused)) bool kc_effect_##name(effect_params_t *params) { return name(params); }
 #include "rgb_matrix_effects.inc"
 #undef RGB_MATRIX_EFFECT
+// ------------------------------------------
 
 // globals
 rgb_config_t rgb_matrix_config; // TODO: would like to prefix this with g_ for global consistancy, do this in another pr
@@ -90,7 +89,6 @@ static uint8_t         rgb_last_enable    = UINT8_MAX;
 static uint8_t         rgb_last_effect    = UINT8_MAX;
 static uint8_t         rgb_current_effect = 0;
 static effect_params_t rgb_effect_params  = {0, LED_FLAG_ALL, false, 0};
-uint8_t                rgb_regions[RGB_MATRIX_LED_COUNT];
 static rgb_task_states rgb_task_state     = SYNCING;
 
 // double buffers
@@ -199,27 +197,6 @@ void rgb_matrix_set_color_all(uint8_t red, uint8_t green, uint8_t blue) {
 #else
     rgb_matrix_driver.set_color_all(red, green, blue);
 #endif
-}
-
-void rgb_matrix_region_set_color(uint8_t region, int index, uint8_t red, uint8_t green, uint8_t blue) {
-    if ((g_led_config.flags[index] & 0xF0) >> 4 == region) {
-        rgb_matrix_driver.set_color(index, red, green, blue);
-    }
-}
-
-void rgb_matrix_region_set_color_all(uint8_t region, uint8_t red, uint8_t green, uint8_t blue) {
-    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
-        if (((g_led_config.flags[i] & 0xF0) >> 4) == region)
-            rgb_matrix_set_color(i, red, green, blue);
-}
-
-__attribute__((weak)) void rgb_matrix_none_indicators_kb(void) {}
-
-__attribute__((weak)) void rgb_matrix_none_indicators_user(void) {}
-
-__attribute__((weak)) void rgb_matrix_none_indicators(void) {
-    rgb_matrix_none_indicators_kb();
-    rgb_matrix_none_indicators_user();
 }
 
 void rgb_matrix_handle_key_event(uint8_t row, uint8_t col, bool pressed) {
