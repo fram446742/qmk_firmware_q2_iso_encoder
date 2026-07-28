@@ -32,7 +32,10 @@
 #include "config.h"
 
 #if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
-#include "rgb_matrix_extensions.h"
+// Forward declarations for QMK weak rgb_matrix hooks so we can override
+// rgb_matrix_none_indicators() below without touching rgb_matrix.h.
+void rgb_matrix_none_indicators_kb(void);
+void rgb_matrix_none_indicators_user(void);
 
 #    define PER_KEY_RGB_VER 0x0001
 
@@ -489,8 +492,9 @@ void os_state_indicate(void) {
 
 void rgb_matrix_none_indicators(void) {
     os_state_indicate();
+    rgb_matrix_none_indicators_kb();
+    rgb_matrix_none_indicators_user();
 }
-
 bool process_record_keychron_rgb(uint16_t keycode, keyrecord_t *record) {
     if ((rgb_matrix_get_mode() == RGB_MATRIX_CUSTOM_MIXED_RGB || rgb_matrix_get_mode() == RGB_MATRIX_CUSTOM_PER_KEY_RGB) && record->event.pressed) {
         switch (keycode) {
