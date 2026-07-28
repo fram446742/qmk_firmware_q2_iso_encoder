@@ -15,10 +15,9 @@
  */
 
 #include <stdlib.h>
-#include QMK_KEYBOARD_H
-#include "keychron_common.h"
 #include "keychron_task.h"
-#include "keychron_raw_hid.h"
+#include "quantum.h"
+#include "keychron_common.h"
 #include "backlit_indicator.h"
 #ifdef FACTORY_TEST_ENABLE
 #    include "factory_test.h"
@@ -27,7 +26,7 @@
 #    include "retail_demo.h"
 #endif
 #ifdef ANANLOG_MATRIX
-#    include "profile.h"
+#include "profile.h"
 #endif
 
 __attribute__((weak)) bool process_record_keychron_kb(uint16_t keycode, keyrecord_t *record) {
@@ -35,50 +34,130 @@ __attribute__((weak)) bool process_record_keychron_kb(uint16_t keycode, keyrecor
 }
 
 bool process_record_keychron(uint16_t keycode, keyrecord_t *record) {
-    return process_record_keychron_kb(keycode, record) && process_record_keychron_common(keycode, record);
+    if (!process_record_keychron_common(keycode, record)) return false;
+
+#ifdef ANANLOG_MATRIX
+    if (!process_record_profile(keycode, record)) return false;
+#endif
+
+#if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    extern bool process_record_wireless(uint16_t keycode, keyrecord_t * record);
+    if (!process_record_wireless(keycode, record)) return false;
+#endif
+
+#ifdef USB_REPORT_INTERVAL_ENABLE
+    extern bool process_record_report_rate(uint16_t keycode, keyrecord_t * record);
+    if (!process_record_report_rate(keycode, record)) return false;
+#endif
+
+#ifdef FACTORY_TEST_ENABLE
+    if (!process_record_factory_test(keycode, record)) return false;
+#endif
+
+#if defined(SNAP_CLICK_ENABLE) && !defined(ANANLOG_MATRIX)
+    extern bool process_record_snap_click(uint16_t keycode, keyrecord_t * record);
+    if (!process_record_snap_click(keycode, record)) return false;
+#endif
+
+    if (!process_record_keychron_kb(keycode, record)) return false;
+
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    if defined(RETAIL_DEMO_ENABLE)
+    if (!process_record_retail_demo(keycode, record)) {
+        return false;
+    }
+#    endif
+
+    extern bool process_record_keychron_rgb(uint16_t keycode, keyrecord_t * record);
+    if (!process_record_keychron_rgb(keycode, record)) {
+        return false;
+    }
+#endif
+
+    return true;
 }
 
 #if defined(LED_MATRIX_ENABLE)
 __attribute__((weak)) bool led_matrix_indicators_keychron(void) {
-    return false;
+#    if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    extern bool led_matrix_indicators_bt(void);
+    led_matrix_indicators_bt();
+#    endif
+#ifdef ANANLOG_MATRIX
+    analog_matrix_indicator();
+#endif
+#    ifdef FACTORY_TEST_ENABLE
+    factory_test_indicator();
+#    endif
+    backlit_indicator();
+
+    return true;
 }
 #endif
 
 #if defined(RGB_MATRIX_ENABLE)
 __attribute__((weak)) bool rgb_matrix_indicators_keychron(void) {
-    return false;
+    os_state_indicate();
+#    if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    extern bool rgb_matrix_indicators_bt(void);
+    rgb_matrix_indicators_bt();
+#    endif
+#ifdef ANANLOG_MATRIX
+    analog_matrix_indicator();
+#endif
+#    ifdef FACTORY_TEST_ENABLE
+    factory_test_indicator();
+#    endif
+    backlit_indicator();
+
+    return true;
 }
 #endif
 
 __attribute__((weak)) void keychron_task_kb(void) {}
 
 void keychron_task(void) {
-    keychron_task_kb();
+#if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    extern void wireless_tasks(void);
+    wireless_tasks();
+#endif
+#ifdef FACTORY_TEST_ENABLE
+    factory_test_task();
+#endif
+#if defined(RETAIL_DEMO_ENABLE) && defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+    retail_demo_task();
+#endif
+
     keychron_common_task();
+
+    keychron_task_kb();
 }
 
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
-    if (!process_record_keychron(keycode, record)) {
-        return false;
-    }
-    return process_record_user(keycode, record);
+    if (!process_record_user(keycode, record)) return false;
+
+    if (!process_record_keychron(keycode, record)) return false;
+
+    return true;
 }
 
 #ifdef RGB_MATRIX_ENABLE
 bool rgb_matrix_indicators_kb(void) {
-    if (!rgb_matrix_indicators_keychron()) {
-        return false;
-    }
-    return rgb_matrix_indicators_user();
+    if (!rgb_matrix_indicators_user()) return false;
+
+    rgb_matrix_indicators_keychron();
+
+    return true;
 }
 #endif
 
 #ifdef LED_MATRIX_ENABLE
 bool led_matrix_indicators_kb(void) {
-    if (!led_matrix_indicators_keychron()) {
-        return false;
-    }
-    return led_matrix_indicators_user();
+    if (!led_matrix_indicators_user()) return false;
+
+    led_matrix_indicators_keychron();
+
+    return true;
 }
 #endif
 

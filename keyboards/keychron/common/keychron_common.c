@@ -298,6 +298,7 @@ void keychron_common_task(void) {
 #ifdef ANANLOG_MATRIX
     process_profile_select_combo();
 #endif
+
 #if defined(WIN_LOCK_HOLD_TIME)
     if (winlock_timer) {
         if (keymap_config.no_gui) {
