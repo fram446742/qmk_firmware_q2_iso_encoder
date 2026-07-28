@@ -89,13 +89,13 @@ void debounce_set(uint8_t new_debounce_type, uint8_t time, bool force);
  * @return false Cooked is the same as before
  */
 
-bool debounce(matrix_row_t raw[], matrix_row_t cooked[], uint8_t num_rows, bool changed) {
-    if (debounce_func.debounce) debounce_func.debounce(raw, cooked, num_rows, changed);
+bool debounce(matrix_row_t raw[], matrix_row_t cooked[], bool changed) {
+    if (debounce_func.debounce) debounce_func.debounce(raw, cooked, MATRIX_ROWS, changed);
 
     return false;
 }
 
-void debounce_init(uint8_t num_rows) {
+void debounce_init(void) {
     debounce_type = 0;
 
     // debounce_set(DEBOUNCE_SYM_EAGER_PER_KEY, DEBOUNCE);

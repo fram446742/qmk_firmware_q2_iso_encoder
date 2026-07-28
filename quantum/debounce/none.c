@@ -17,9 +17,9 @@
 #include "debounce.h"
 #include <string.h>
 
-void debounce_init(uint8_t num_rows) {}
+void debounce_init(void) {}
 
-bool debounce(matrix_row_t raw[], matrix_row_t cooked[], uint8_t num_rows, bool changed) {
+bool debounce(matrix_row_t raw[], matrix_row_t cooked[], bool changed) {
     bool cooked_changed = false;
 
     if (changed) {
@@ -32,5 +32,3 @@ bool debounce(matrix_row_t raw[], matrix_row_t cooked[], uint8_t num_rows, bool 
 
     return cooked_changed;
 }
-
-__attribute__((weak)) void debounce_free(void) {}
