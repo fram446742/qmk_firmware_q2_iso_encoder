@@ -29,6 +29,11 @@
 #include "keychron_common.h"
 #include "keychron_task.h"
 #include "backlit_indicator.h"
+#if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+#    include "transport.h"
+#    include "wireless.h"
+#endif
+
 #if defined(LED_MATRIX_ENABLE) || defined(RGB_MATRIX_ENABLE)
 
 typedef struct {
@@ -66,7 +71,11 @@ void indicator_eeconfig_reload(void) {
 
 __attribute__((weak)) void os_state_indicate(void) {
 #    if defined(RGB_MATRIX_SLEEP) || defined(LED_MATRIX_SLEEP)
+#        if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    if (get_transport() == TRANSPORT_USB && USB_DRIVER.state == USB_SUSPENDED) return;
+#        else
     if (USB_DRIVER.state == USB_SUSPENDED) return;
+#        endif
 #    endif
 
 #    if defined(NUM_LOCK_INDEX)
@@ -104,7 +113,11 @@ __attribute__((weak)) void os_state_indicate(void) {
 #    endif
 
 #    if defined(WINLOCK_LED_LIST) || defined(WIN_LOCK_LED_PIN)
-    if (get_transport() == TRANSPORT_USB) {
+#        if defined(LK_WIRELESS_ENABLE) || defined(KC_BLUETOOTH_ENABLE)
+    // TODO: check if we can use (get_transport() == TRANSPORT_USB || wireless_get_state() == WT_CONNECTED)
+    if (get_transport() == TRANSPORT_USB || ((get_transport() & TRANSPORT_WIRELESS) && wireless_get_state() == WT_CONNECTED))
+#        endif
+    {
 #        ifdef WIN_BASE_LAYER
         if (get_highest_layer(default_layer_state) == WIN_BASE_LAYER)
 #        endif
