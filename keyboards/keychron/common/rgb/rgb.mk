@@ -5,6 +5,7 @@ RGB_MATRIX_DIR = $(TOP_DIR)/keyboards/keychron/common/rgb
 
 SRC += \
      $(RGB_MATRIX_DIR)/keychron_rgb.c \
+     $(RGB_MATRIX_DIR)/rgb_matrix_extensions.c \
      $(RGB_MATRIX_DIR)/per_key_rgb.c \
      $(RGB_MATRIX_DIR)/mixed_rgb.c \
      $(RGB_MATRIX_DIR)/retail_demo.c
