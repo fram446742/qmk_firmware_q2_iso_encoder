@@ -163,6 +163,8 @@ int rgb_matrix_led_index(int index);
 
 void rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue);
 void rgb_matrix_set_color_all(uint8_t red, uint8_t green, uint8_t blue);
+void rgb_matrix_region_set_color(uint8_t region, int index, uint8_t red, uint8_t green, uint8_t blue);
+void rgb_matrix_region_set_color_all(uint8_t region, uint8_t red, uint8_t green, uint8_t blue);
 
 void rgb_matrix_handle_key_event(uint8_t row, uint8_t col, bool pressed);
 
