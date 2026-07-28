@@ -16,6 +16,9 @@
 
 #pragma once
 
+/* Encoder Configuration */
+#define ENCODER_DEFAULT_POS 0x3
+
 #ifdef KEYCHRON_ENABLE
 #    include "eeconfig_kb.h"
 #endif
