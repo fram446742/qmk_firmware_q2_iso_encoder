@@ -19,8 +19,8 @@ static bool     saved_rgb_enabled = false;
 // Show the default base layer.  default_layer_state tracks Mac (0) vs Win (1).
 // Layer 0 → key "0" (LED 10), layer 1 → key "1" (LED 1), layer N→key N (LED N).
 static uint8_t layer_to_led(uint8_t layer) {
-    if (layer == 0) return 10;
-    if (layer >= 1 && layer <= 8) return layer;
+    if (layer == 0) return 10;   // key "0"
+    if (layer >= 1 && layer <= 9) return layer;  // keys "1"–"9"
     return 255;
 }
 
@@ -64,10 +64,14 @@ void indicator_draw(void) {
     rgb_matrix_set_color_all(0, 0, 0);
 
     // ── Active-layer indicator ──────────────────────────────────────────
-    // Light the number key matching the highest active layer.
-    // Uses layer_state so TG(N) toggles are reflected immediately.
-    uint8_t layer = get_highest_layer(layer_state);
-    uint8_t led   = layer_to_led(layer);
+    // Shows the default base layer (Mac/Win switch) plus any layers
+    // toggled via overview.  Combines layer_state and default_layer_state.
+    uint8_t base    = get_highest_layer(default_layer_state);
+    uint8_t highest = get_highest_layer(layer_state);
+    // If the highest active layer differs from the default, show the
+    // toggled layer; otherwise show the default (mac/win).
+    uint8_t display = (highest != base) ? highest : base;
+    uint8_t led     = layer_to_led(display);
     if (led < RGB_MATRIX_LED_COUNT) {
         rgb_matrix_set_color(led, 255, 255, 255);  // white
     }
