@@ -166,32 +166,70 @@ enum layers {
 // Each base_kc can appear at most once.  Duplicate base_kc entries
 // (e.g. KC_LBRC for both "{" and "[") must be resolved by commenting one.
 
-// ── Override config ─────────────────────────────────────────────────────
+// ── Three mutually exclusive double-tap action types ─────────────────────
+typedef enum {
+    TD_DBL_KEYCODE,     // .dbl_kc: regular QMK keycode (e.g. KC_DEL, CW_TOGG)
+    TD_DBL_UNICODE_STR, // .str:   Unicode string (e.g. "€")
+    TD_DBL_UNICODE_CDP,  // .cdp:    Raw codepoint (e.g. 0x20AC for €)
+} td_dbl_type_t;
 
 typedef struct {
-    uint16_t     base_kc;     // the key to intercept
-    uint16_t     tap_kc;      // sent on single tap
-    uint16_t     dbl_kc;      // sent on double tap (0 = use unicode)
-    const char  *unicode;     // Unicode string for double tap (NULL = use dbl_kc)
+    uint16_t      base_kc;     // the key to intercept
+    uint16_t      tap_kc;      // sent on single tap
+    td_dbl_type_t dbl_type;    // selects which union member is active
+    union {
+        uint16_t    dbl_kc;   // for TD_DBL_KEYCODE
+        const char *str;      // for TD_DBL_UNICODE_STR
+        uint32_t    cdp;       // for TD_DBL_UNICODE_CDP
+    }; // anonymous union — access directly as ov->dbl_kc / .str / .cdp
 } tap_override_t;
 
-static const tap_override_t PROGMEM tap_overrides[] = { // base,             tap,      dbl,       unicode
-    {KC_BSPC,           KC_BSPC,  KC_DEL,    NULL},     // Bspc → Del
-    {KC_ESC,            KC_ESC,   CW_TOGG,   NULL},     // Esc → CapsWord
-    {KC_E,              KC_E,     0,         "€"},      //  e → €
-    {KC_2,              KC_2,     0,         "@"},      //  2 → @
-    {KC_3,              KC_3,     0,         "#"},      //  3 → #
-    {KC_5,              KC_5,     0,         "½"},      //  5 → ½
-    {KC_6,              KC_6,     0,         "¬"},      //  6 → ¬
-    {KC_GRV,            KC_GRV,   0,         "~"},      //  ` → ~
-    {KC_BSLS,           KC_BSLS,  0,         "|"},      //  \ → |
-    {KC_LBRC,           KC_LBRC,  0,         "{"},     //  [ → {
-    //{KC_LBRC,          KC_LBRC,  0,         "["},     //  DUPLICATE: same key as "{"
-    {KC_RBRC,           KC_RBRC,  0,         "}"},     //  ] → }
-    //{KC_RBRC,          KC_RBRC,  0,         "]"},     //  DUPLICATE: same key as "}"
-    {KC_NUBS,           KC_NUBS,  0,         "\\"},     // NuBS to backslash
-    //{KC_NUBS,          KC_NUBS,  0,         "¸"},     //  DUPLICATE: same key as backslash
+// ── Duplicate check ────────────────────────────────────────────────────────
+#define TAPDUP(kc) TAPDUPCHECK_##kc
+enum {
+    TAPDUP(KC_BSPC) = 0, TAPDUP(KC_ESC)  = 0,
+    TAPDUP(KC_E)    = 0, TAPDUP(KC_2)    = 0,
+    TAPDUP(KC_3)    = 0, TAPDUP(KC_5)    = 0,
+    TAPDUP(KC_6)    = 0, TAPDUP(KC_GRV)  = 0,
+    TAPDUP(KC_BSLS) = 0, TAPDUP(KC_LBRC) = 0,
+    TAPDUP(KC_RBRC) = 0, TAPDUP(KC_NUBS) = 0,
 };
+
+// ── Override table ───────────────────────────────────────────────────────────
+//  TD idx   type         base        tap         action
+//  ───────  ───────────  ──────────  ──────────  ────────────────────────────
+static const tap_override_t PROGMEM tap_overrides[] = {
+    // TD(0x5700)  keycode
+    {.base_kc = KC_BSPC, .tap_kc = KC_BSPC, .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = KC_DEL},
+    // TD(0x5701)  keycode
+    {.base_kc = KC_ESC,  .tap_kc = KC_ESC,  .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = CW_TOGG},
+    // TD(0x5702)  unicode string
+    {.base_kc = KC_E,    .tap_kc = KC_E,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "€"},
+    // TD(0x5703)  unicode string
+    {.base_kc = KC_2,    .tap_kc = KC_2,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "@"},
+    // TD(0x5704)  unicode string
+    {.base_kc = KC_3,    .tap_kc = KC_3,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "#"},
+    // TD(0x5705)  unicode string
+    {.base_kc = KC_5,    .tap_kc = KC_5,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "½"},
+    // TD(0x5706)  unicode string
+    {.base_kc = KC_6,    .tap_kc = KC_6,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "¬"},
+    // TD(0x5707)  unicode string
+    {.base_kc = KC_GRV,  .tap_kc = KC_GRV,  .dbl_type = TD_DBL_UNICODE_STR, .str   = "~"},
+    // TD(0x5708)  unicode string
+    {.base_kc = KC_BSLS, .tap_kc = KC_BSLS, .dbl_type = TD_DBL_UNICODE_STR, .str   = "|"},
+    // TD(0x5709)  unicode string
+    {.base_kc = KC_LBRC, .tap_kc = KC_LBRC, .dbl_type = TD_DBL_UNICODE_STR, .str   = "{"},
+    // TD(0x570A)  unicode string
+    {.base_kc = KC_RBRC, .tap_kc = KC_RBRC, .dbl_type = TD_DBL_UNICODE_STR, .str   = "}"},
+    // TD(0x570B)  unicode string
+    {.base_kc = KC_NUBS, .tap_kc = KC_NUBS, .dbl_type = TD_DBL_UNICODE_STR, .str   = "\\"},
+};
+// An example of each possible double-tap action type.
+//    {KC_ESC,  KC_ESC,  .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = CW_TOGG},
+//    {KC_E,    KC_E,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "€"},
+//    {KC_GRV,  KC_GRV,  .dbl_type = TD_DBL_UNICODE_CDP, .cdp    = 0x007E},
+
+
 
 // ── State ───────────────────────────────────────────────────────────────
 
@@ -203,12 +241,22 @@ static uint16_t tap_timer       = 0;
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 static void tap_fire_override(const tap_override_t *ov) {
-    uint16_t dbl = pgm_read_word(&ov->dbl_kc);
-    const char *uni = ov->unicode;  // PROGMEM pointer, safe to read
-    if (uni) {
-        send_unicode_string(uni);
-    } else if (dbl) {
-        tap_code16(dbl);
+    switch (ov->dbl_type) {
+        case TD_DBL_KEYCODE: {
+            uint16_t kc = ov->dbl_kc;
+            if (kc >= QK_UNICODE && kc <= QK_UNICODE_MAX) {
+                register_unicode(kc & 0x7FFF);
+            } else {
+                tap_code16(kc);
+            }
+            break;
+        }
+        case TD_DBL_UNICODE_STR:
+            send_unicode_string(ov->str);
+            break;
+        case TD_DBL_UNICODE_CDP:
+            register_unicode(ov->cdp);
+            break;
     }
 }
 
@@ -458,9 +506,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case (3 << 4) | 7:  // N
                 clear_keyboard();
                 keymap_config.nkro = !keymap_config.nkro;
-                feature_overview_reset_timer();
-                return false;
-
+                feature_overview_reset_timer(); return false;
             // Layer toggles via number row — TG(N)
             case (0 << 4) | 10:  // 0
                 layer_invert(0); feature_overview_reset_timer(); return false;
