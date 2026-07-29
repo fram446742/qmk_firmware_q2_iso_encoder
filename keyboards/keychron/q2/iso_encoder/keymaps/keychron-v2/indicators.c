@@ -64,9 +64,9 @@ void indicator_draw(void) {
     rgb_matrix_set_color_all(0, 0, 0);
 
     // ── Active-layer indicator ──────────────────────────────────────────
-    // Light the number key matching the current default (base) layer.
-    // default_layer_state tracks Mac (layer 0) vs Windows (layer 1).
-    uint8_t layer = get_highest_layer(default_layer_state);
+    // Light the number key matching the highest active layer.
+    // Uses layer_state so TG(N) toggles are reflected immediately.
+    uint8_t layer = get_highest_layer(layer_state);
     uint8_t led   = layer_to_led(layer);
     if (led < RGB_MATRIX_LED_COUNT) {
         rgb_matrix_set_color(led, 255, 255, 255);  // white
