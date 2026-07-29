@@ -32,3 +32,7 @@ UNICODE_ENABLE = yes
 
 # Link-time optimization — reduces flash usage
 LTO_ENABLE = yes
+
+# Custom modules for this keymap (feature toggles, indicators)
+SRC += features.c
+SRC += indicators.c

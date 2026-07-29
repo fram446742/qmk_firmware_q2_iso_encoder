@@ -17,6 +17,9 @@
 #include QMK_KEYBOARD_H
 #include "keychron_common.h"
 #include "send_string.h"
+#include "features.h"
+#include "indicators.h"
+#include "combos.h"
 
 // =============================================================================
 // Layers
@@ -58,30 +61,12 @@ tap_dance_action_t tap_dance_actions[] = {
 #endif // TAP_DANCE_ENABLE
 
 // =============================================================================
-// Combos — simultaneous key chords
+// Combos — defined in combos.c, #included here so keymap_introspection sees them
 // =============================================================================
-// Combo keys don't need to be placed in the keymap — they fire automatically
-// when the listed keys are pressed together within COMBO_TERM (default 50ms).
 
 #ifdef COMBO_ENABLE
-
-enum combo_events {
-    CB_ESC,            // A + S  → Escape  (left home row)
-    CB_BSPC,           // J + K  → Backspace  (right home row)
-    CB_DEL,            // K + L  → Delete  (right home row)
-};
-
-const uint16_t PROGMEM cb_esc_combo[]  = {KC_A, KC_S, COMBO_END};
-const uint16_t PROGMEM cb_bspc_combo[] = {KC_J, KC_K, COMBO_END};
-const uint16_t PROGMEM cb_del_combo[]  = {KC_K, KC_L, COMBO_END};
-
-combo_t key_combos[] = {
-    [CB_ESC]  = COMBO(cb_esc_combo,  KC_ESC),
-    [CB_BSPC] = COMBO(cb_bspc_combo, KC_BSPC),
-    [CB_DEL]  = COMBO(cb_del_combo,  KC_DEL),
-};
-
-#endif // COMBO_ENABLE
+#    include "combos.c"
+#endif
 
 // =============================================================================
 // Key Overrides — modifier + key → different output
@@ -219,4 +204,41 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
     [_FN4]     = { ENCODER_CCW_CW(_______, _______) },
     [_FN5]     = { ENCODER_CCW_CW(_______, _______) },
 };
+#endif
+
+// =============================================================================
+// User callbacks — feature toggles, indicators, animation overview
+// =============================================================================
+
+#if defined(COMBO_ENABLE) || defined(KEY_OVERRIDE_ENABLE)
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+        switch (keycode) {
+#ifdef COMBO_ENABLE
+            case KC_AUTOSHIFT_TOGGLE:
+                feature_toggle_auto_shift();
+                return false;
+            case KC_FEAT_OVERVIEW:
+                feature_overview_trigger();
+                return false;
+#endif
+        }
+    }
+    return true;
+}
+#endif
+
+void keyboard_post_init_user(void) {
+    features_init();
+}
+
+void matrix_scan_user(void) {
+    indicator_task();
+}
+
+#if defined(RGB_MATRIX_ENABLE)
+bool rgb_matrix_indicators_user(void) {
+    indicator_draw();
+    return false;
+}
 #endif
