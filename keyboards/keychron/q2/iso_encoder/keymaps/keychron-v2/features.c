@@ -5,6 +5,9 @@
 #include "eeprom.h"
 #include "action_layer.h"
 
+#ifdef TAP_DANCE_ENABLE
+#    include "process_tap_dance.h"  // reset_tap_dance, tap_dance_get_state
+#endif
 #ifdef AUTO_SHIFT_ENABLE
 #    include "process_auto_shift.h"
 #endif
@@ -27,6 +30,15 @@ static void feature_apply_flag(uint8_t flag) {
     bool enabled = feature_has(flag);
 
     switch (flag) {
+        case FEATURE_TAP_DANCE:
+            // The fence in preprocess_record_user handles conversion.
+            // Reset in-progress taps when disabling so they don't fire
+            // after the user thinks tap dance is off.
+            if (!enabled) {
+                reset_tap_dance(tap_dance_get_state(0));
+                reset_tap_dance(tap_dance_get_state(1));
+            }
+            break;
 #ifdef AUTO_SHIFT_ENABLE
         case FEATURE_AUTO_SHIFT:
             if (enabled) {
@@ -42,6 +54,7 @@ static void feature_apply_flag(uint8_t flag) {
 }
 
 static void feature_apply_all(void) {
+    feature_apply_flag(FEATURE_TAP_DANCE);
     feature_apply_flag(FEATURE_AUTO_SHIFT);
 }
 

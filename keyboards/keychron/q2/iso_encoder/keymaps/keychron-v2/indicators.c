@@ -57,27 +57,34 @@ void indicator_draw(void) {
 
     // Draw feature status indicators
     // Active features → white (255,255,255)
-    // Inactive features → very dim gray (5,5,5) so position is visible
+    // Inactive features → red (255,0,0) so position is visible
 
     // Caps Lock (on Caps Lock key)
     if (host_keyboard_led_state().caps_lock) {
         rgb_matrix_set_color(IND_CAPS_LOCK, 255, 255, 255);
     } else {
-        rgb_matrix_set_color(IND_CAPS_LOCK, 5, 5, 5);
+        rgb_matrix_set_color(IND_CAPS_LOCK, 255, 0, 0);
     }
 
     // Auto-shift (on A key)
     if (feature_auto_shift()) {
-        rgb_matrix_set_color(IND_AUTO_SHIFT, 0, 255, 0);
+        rgb_matrix_set_color(IND_AUTO_SHIFT, 255, 255, 255);
     } else {
-        rgb_matrix_set_color(IND_AUTO_SHIFT, 5, 5, 5);
+        rgb_matrix_set_color(IND_AUTO_SHIFT, 255, 0, 0);
+    }
+
+    // Tap Dance (on T key)
+    if (feature_tap_dance()) {
+        rgb_matrix_set_color(IND_TAP_DANCE, 255, 255, 255);
+    } else {
+        rgb_matrix_set_color(IND_TAP_DANCE, 255, 0, 0);
     }
 
     // NKRO (on N key)
     if (keymap_config.nkro) {
         rgb_matrix_set_color(IND_NKRO, 255, 255, 255);
     } else {
-        rgb_matrix_set_color(IND_NKRO, 5, 5, 5);
+        rgb_matrix_set_color(IND_NKRO, 255, 0, 0);
     }
 }
 
