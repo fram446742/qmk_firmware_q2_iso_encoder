@@ -72,8 +72,10 @@ __attribute__((weak)) rgb_t rgb_matrix_hsv_to_rgb(hsv_t hsv) {
 // ------------------------------------------
 
 // Non-static effect wrappers for custom keyboard code (mixed_rgb.c, per_key_rgb.c)
-#define RGB_MATRIX_EFFECT(name, ...) \
-    __attribute__((unused)) bool kc_effect_##name(effect_params_t *params) { return name(params); }
+#define RGB_MATRIX_EFFECT(name, ...)                                         \
+    __attribute__((unused)) bool kc_effect_##name(effect_params_t *params) { \
+        return name(params);                                                 \
+    }
 #if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
 #    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
 #else
@@ -104,9 +106,9 @@ static uint8_t         rgb_last_effect    = UINT8_MAX;
 static uint8_t         rgb_current_effect = 0;
 static effect_params_t rgb_effect_params  = {0, LED_FLAG_ALL, false, 0};
 #if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
-extern uint8_t         rgb_regions[RGB_MATRIX_LED_COUNT];
+extern uint8_t rgb_regions[RGB_MATRIX_LED_COUNT];
 #endif
-static rgb_task_states rgb_task_state     = SYNCING;
+static rgb_task_states rgb_task_state = SYNCING;
 
 // double buffers
 static uint32_t rgb_timer_buffer;
@@ -873,11 +875,11 @@ const char *rgb_matrix_get_mode_name(uint8_t mode) {
 #    define RGB_MATRIX_EFFECT(name, ...) \
         case RGB_MATRIX_##name:          \
             return #name;
-#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
-#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
-#else
-#    include "rgb_matrix_effects.inc"
-#endif
+#    if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#        include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
+#    else
+#        include "rgb_matrix_effects.inc"
+#    endif
 #    undef RGB_MATRIX_EFFECT
 
 #    ifdef COMMUNITY_MODULES_ENABLE

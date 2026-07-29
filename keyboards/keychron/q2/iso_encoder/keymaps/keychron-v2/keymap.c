@@ -6,10 +6,12 @@
  * ═════════════════════════════════════════════════════════════════════════════
  *
  * LAYERS
- * ──────                                                                    
- * 8 layers: MAC_BASE / WIN_BASE / MAC_FN1 / WIN_FN1 / _FN2 / _FN3 / _FN4 / _FN5
- * - First 5 have default key assignments; _FN3–_FN5 are blank (configurable
- *   via VIA).  FN1 triggers MAC_FN1 (Mac) or WIN_FN1 (Win) depending on base.
+ * ──────
+ * 9 layers: from MAC_BASE (0) to _FN6 (8).  Feature overview (O+P) lights
+ *   the matching number key for the active layer (layer 0 → key 0, etc.).
+ * - First 5 have default key assignments.
+ * - _FN3–_FN6 are blank — configure via VIA.
+ * - FN1 triggers MAC_FN1 (Mac) or WIN_FN1 (Win) depending on base.
  * - Base layers have tap-dance versions of Esc and Backspace (see below).
  *
  * TAP DANCE  (TAP_DANCE_ENABLE)
@@ -134,6 +136,7 @@ enum layers {
     _FN3,
     _FN4,
     _FN5,
+    _FN6,
 };
 
 #define FN1_MAC MO(MAC_FN1)
@@ -141,21 +144,132 @@ enum layers {
 #define FN2     MO(_FN2)
 
 // =============================================================================
-// Tap Dance — tap vs double-tap
+// Tap Dance — custom callbacks (CUSTOM_TAP_DANCE_DOUBLE)
 // =============================================================================
-// Replace KC_ESC / KC_BSPC on base layers to add double-tap actions.
-// Fallback plain keys are on _FN3.
+// Instead of the built-in ACTION_TAP_DANCE_DOUBLE, we define our own
+// callback so any keycode (including CW_TOGG, UC() etc.) works reliably
+// and custom behaviours can be added without touching QMK core.
+//
+// To add a new tap dance:
+//   1. Add an enum entry
+//   2. Add a user_data array with {tap_kc, double_tap_kc}
+//   3. Add the array address to tap_dance_actions[] with CUSTOM_TD_DOUBLE
+//   4. Use TD(MY_NEW) in the keymaps
+//
+// Example already added: TD_E_EURO — tap=E, double=€
 
 #ifdef TAP_DANCE_ENABLE
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+// Data for CUSTOM_TD_DOUBLE_UNICODE: single-tap keycode + Unicode string.
+typedef struct {
+    uint16_t     tap_kc;
+    const char  *unicode_str;
+} td_unicode_pair_t;
+
+// ── Custom pair callbacks ───────────────────────────────────────────────
+
+static void td_double_finished(tap_dance_state_t *state, void *user_data) {
+    tap_dance_pair_t *pair = (tap_dance_pair_t *)user_data;
+    uint16_t kc = (state->count == 1) ? pair->kc1 : pair->kc2;
+
+    // Unicode codepoints (0x8000-0xBFFF range from UC() macro) need
+    // register_unicode() to go through the OS input method.  tap_code16()
+    // bypasses the Unicode processing pipeline and sends raw HID codes.
+    if (kc >= QK_UNICODE && kc <= QK_UNICODE_MAX) {
+        register_unicode(kc & 0x7FFF);
+    } else {
+        tap_code16(kc);
+    }
+
+    reset_tap_dance(state);
+}
+
+static void td_double_reset(tap_dance_state_t *state, void *user_data) {
+    // No cleanup needed — td_double_finished / td_double_str_finished
+    // already do press+release and call reset_tap_dance(state).
+    // Calling reset_tap_dance again here would recurse forever.
+}
+
+// ── Unicode-string callback ─────────────────────────────────────────────
+
+static void td_double_str_finished(tap_dance_state_t *state, void *user_data) {
+    td_unicode_pair_t *pair = (td_unicode_pair_t *)user_data;
+    if (state->count == 1) {
+        tap_code16(pair->tap_kc);
+    } else {
+        send_unicode_string(pair->unicode_str);
+    }
+    reset_tap_dance(state);
+}
+
+// ── Helper macros ───────────────────────────────────────────────────────
+
+// For regular keycode pairs:  CUSTOM_TD_DOUBLE(KC_BSPC, KC_DEL)
+#define CUSTOM_TD_DOUBLE(kc1, kc2)                                          \
+    { .fn = {NULL, td_double_finished, td_double_reset, NULL},               \
+      .user_data = (void *)&((tap_dance_pair_t){kc1, kc2}) }
+
+// For Unicode string double-actions:  CUSTOM_TD_DOUBLE_UNICODE(KC_E, "€")
+// Works on any OS (Linux IBus, Win Alt-code, Mac Hex Input).
+#define CUSTOM_TD_DOUBLE_UNICODE(kc1, str)                                  \
+    { .fn = {NULL, td_double_str_finished, td_double_reset, NULL},           \
+      .user_data = (void *)&((td_unicode_pair_t){kc1, str}) }
+
+// (We use the built-in td_double_reset from QMK — no custom reset needed.)
+
+// ── Enum ────────────────────────────────────────────────────────────────
 
 enum {
     TD_BSPC_DEL,       // tap = Backspace,  double-tap = Delete
     TD_ESC_CAPS,       // tap = Escape,    double-tap = Caps Word toggle
+    TD_E_EURO,         // tap = e,         double-tap = € (U+20AC)
+    TD_ESC,
+    TD_PIPE,
+    TD_AT,
+    TD_HASH,
+    TD_TILDE,
+    TD_HALF,
+    TD_NOT,
+    TD_LBRACE,
+    TD_LBRACKET,
+    TD_RBRACKET,
+    TD_RBRACE,
+    TD_BACKSLASH,
+    TD_CEDILLA,
 };
 
+// ── Static pair-data arrays (PROGMEM-safe via compound literal in macro) ─
+
+// Three macro patterns available (all shown for reference):
+//
+//   CUSTOM_TD_DOUBLE(KC_BSPC, KC_DEL)           — two regular keycodes
+//   CUSTOM_TD_DOUBLE(KC_ESC,  CW_TOGG)           — keycode + special keycode
+//   CUSTOM_TD_DOUBLE(KC_E,    UC(0x20AC))         — keycode + UC() codepoint
+//   CUSTOM_TD_DOUBLE_UNICODE(KC_E, "€")          — keycode + Unicode string (OS-agnostic)
+//
+// The string variant uses send_unicode_string() which works on all OSes.
+// The UC() variant is OS-dependent (needs correct Unicode input method).
+
 tap_dance_action_t tap_dance_actions[] = {
-    [TD_BSPC_DEL] = ACTION_TAP_DANCE_DOUBLE(KC_BSPC, KC_DEL),
-    [TD_ESC_CAPS] = ACTION_TAP_DANCE_DOUBLE(KC_ESC, CW_TOGG),
+    [TD_BSPC_DEL] = CUSTOM_TD_DOUBLE(KC_BSPC,             KC_DEL),
+    [TD_ESC_CAPS] = CUSTOM_TD_DOUBLE(KC_ESC,               CW_TOGG),
+    //[TD_E_EURO] = CUSTOM_TD_DOUBLE(KC_E,              UC(0x20AC)),   // UC() approach
+    [TD_E_EURO]   = CUSTOM_TD_DOUBLE_UNICODE(KC_E,          "€"),       // string approach
+    [TD_ESC] = CUSTOM_TD_DOUBLE_UNICODE(KC_ESC, "ª"),
+    [TD_PIPE] = CUSTOM_TD_DOUBLE_UNICODE(KC_BSLS, "|"),
+    [TD_AT] = CUSTOM_TD_DOUBLE_UNICODE(KC_2, "@"),
+    [TD_HASH] = CUSTOM_TD_DOUBLE_UNICODE(KC_3, "#"),
+    [TD_TILDE] = CUSTOM_TD_DOUBLE_UNICODE(KC_GRV, "~"),
+    [TD_HALF] = CUSTOM_TD_DOUBLE_UNICODE(KC_5, "½"),
+    [TD_NOT] = CUSTOM_TD_DOUBLE_UNICODE(KC_6, "¬"),
+    [TD_LBRACE] = CUSTOM_TD_DOUBLE_UNICODE(KC_7, "{"),
+    [TD_LBRACKET] = CUSTOM_TD_DOUBLE_UNICODE(KC_8, "["),
+    [TD_RBRACKET] = CUSTOM_TD_DOUBLE_UNICODE(KC_9, "]"),
+    [TD_RBRACE] = CUSTOM_TD_DOUBLE_UNICODE(KC_0, "}"),
+    [TD_BACKSLASH] = CUSTOM_TD_DOUBLE_UNICODE(KC_MINS, "\\"),
+    [TD_CEDILLA] = CUSTOM_TD_DOUBLE_UNICODE(KC_EQL, "¸"),
 };
 
 #endif // TAP_DANCE_ENABLE
@@ -233,14 +347,14 @@ void leader_end_user(void) {
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [MAC_BASE] = LAYOUT_iso_68(
-        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   TD(TD_BSPC_DEL),    KC_MUTE,
+        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,    KC_MUTE,
         KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,                      KC_DEL,
         KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,  KC_NUHS,  KC_ENT,             KC_HOME,
         KC_LSFT,  KC_NUBS,  KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,  KC_UP,
         KC_LCTL,  KC_LOPTN, KC_LCMMD,                               KC_SPC,                                 KC_RCMMD, FN1_MAC,  FN2,      KC_LEFT,  KC_DOWN,  KC_RGHT),
 
     [WIN_BASE] = LAYOUT_iso_68(
-        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   TD(TD_BSPC_DEL),    KC_MUTE,
+        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,    KC_MUTE,
         KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,                      KC_DEL,
         KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,  KC_NUHS,  KC_ENT,             KC_HOME,
         KC_LSFT,  KC_NUBS,  KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,  KC_UP,
@@ -287,6 +401,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
         _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  _______,
         _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,  _______,  _______),
+
+    [_FN6] = LAYOUT_iso_68(
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      _______,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  _______,
+        _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,  _______,  _______),
 };
 
 // =============================================================================
@@ -303,6 +424,7 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
     [_FN3]     = { ENCODER_CCW_CW(_______, _______) },
     [_FN4]     = { ENCODER_CCW_CW(_______, _______) },
     [_FN5]     = { ENCODER_CCW_CW(_______, _______) },
+    [_FN6]     = { ENCODER_CCW_CW(_______, _______) },
 };
 #endif
 
@@ -311,26 +433,32 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // =============================================================================
 
 // ── Tap dance runtime fence ────────────────────────────────────────────────
-// When tap dance is DISABLED (via feature flag), intercept TD keycodes before
-// process_tap_dance() sees them and convert to plain keys.
+// When tap dance is DISABLED, intercept ALL TD keycodes before
+// process_tap_dance() sees them and send the plain single-tap keycode.
 // The fence runs in preprocess_record_user which fires BEFORE tap dance.
+//
+// The plain-key fallback table must stay in sync with the enum order.
 
 #if defined(TAP_DANCE_ENABLE) && defined(COMBO_ENABLE)
-bool preprocess_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!feature_tap_dance()) {
-        switch (keycode) {
-            case TD(TD_BSPC_DEL):
-                if (record->event.pressed) {
-                    tap_code(KC_BSPC);
-                }
-                return false;  // block all further processing for this key
 
-            case TD(TD_ESC_CAPS):
-                if (record->event.pressed) {
-                    tap_code(KC_ESC);
-                }
-                return false;
+// Plain-key fallback for each TD index (used when tap dance is disabled).
+// The order/indices must match the TD_ enum in this file.
+static const uint16_t PROGMEM td_plain_fallback[] = {
+    [TD_BSPC_DEL] = KC_BSPC,
+    [TD_ESC_CAPS] = KC_ESC,
+    [TD_E_EURO]   = KC_E,
+};
+
+bool preprocess_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!feature_tap_dance() && IS_QK_TAP_DANCE(keycode)) {
+        uint8_t idx = QK_TAP_DANCE_GET_INDEX(keycode);
+        if (idx < ARRAY_SIZE(td_plain_fallback)) {
+            uint16_t plain = pgm_read_word(&td_plain_fallback[idx]);
+            if (record->event.pressed) {
+                tap_code16(plain);
+            }
         }
+        return false;  // block all further processing
     }
     return true;
 }
@@ -350,6 +478,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case KC_NKRO_TOGGLE:
                 clear_keyboard();
                 keymap_config.nkro = !keymap_config.nkro;
+                return false;
+            case KC_CAPS_WORD_TOGGLE:
+                feature_toggle_caps_word();
+                return false;
+            case KC_REPEAT_KEY_TOGGLE:
+                feature_toggle_repeat_key();
+                return false;
+            case KC_DYN_MACRO_TOGGLE:
+                feature_toggle_dyn_macro();
+                return false;
+            case KC_LEADER_TOGGLE:
+                feature_toggle_leader();
                 return false;
             case KC_FEAT_OVERVIEW:
                 feature_overview_trigger();
