@@ -35,6 +35,14 @@ enum layers {
 #define FN1_WIN MO(WIN_FN1)
 #define FN2     MO(_FN2)
 
+// If already on layer N, jump back to default; otherwise go to N.
+#define LAYER_MOVE_OR_DEFAULT(N) do {                                      \
+    if (get_highest_layer(layer_state) == (N))                             \
+        layer_move(get_highest_layer(default_layer_state));                \
+    else                                                                    \
+        layer_move(N);                                                      \
+} while(0)
+
 // =============================================================================
 // Tap Dance — custom callbacks (CUSTOM_TAP_DANCE_DOUBLE)
 // =============================================================================
@@ -334,27 +342,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 clear_keyboard();
                 keymap_config.nkro = !keymap_config.nkro;
                 feature_overview_reset_timer(); return false;
-            // Layer toggles via number row — TG(N)
+            // Layer switching via number row
+            // Press same layer → back to default. Press different → go there.
+            // Physical Mac/Win switch (detected in matrix_scan_user) also
+            // resets to the switched default.
             case (0 << 4) | 10:  // 0
-                layer_invert(0); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(0); feature_overview_reset_timer(); return false;
             case (0 << 4) | 1:   // 1
-                layer_invert(1); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(1); feature_overview_reset_timer(); return false;
             case (0 << 4) | 2:   // 2
-                layer_invert(2); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(2); feature_overview_reset_timer(); return false;
             case (0 << 4) | 3:   // 3
-                layer_invert(3); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(3); feature_overview_reset_timer(); return false;
             case (0 << 4) | 4:   // 4
-                layer_invert(4); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(4); feature_overview_reset_timer(); return false;
             case (0 << 4) | 5:   // 5
-                layer_invert(5); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(5); feature_overview_reset_timer(); return false;
             case (0 << 4) | 6:   // 6
-                layer_invert(6); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(6); feature_overview_reset_timer(); return false;
             case (0 << 4) | 7:   // 7
-                layer_invert(7); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(7); feature_overview_reset_timer(); return false;
             case (0 << 4) | 8:   // 8
-                layer_invert(8); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(8); feature_overview_reset_timer(); return false;
             case (0 << 4) | 9:   // 9
-                layer_invert(9); feature_overview_reset_timer(); return false;
+                LAYER_MOVE_OR_DEFAULT(9); feature_overview_reset_timer(); return false;
 
             // Any other key → exit overview
             default:
@@ -469,9 +480,19 @@ void keyboard_post_init_user(void) {
     features_init();
 }
 
+// ── Physical switch tracking ───────────────────────────────────────────────
+// Detects changes to default_layer_state (Mac/Win physical switch) and
+// jumps to the new default, overriding any overview-toggled layer.
+static layer_state_t last_default_layer = 0;
+
 void matrix_scan_user(void) {
     indicator_task();
     tap_override_task();
+
+    if (last_default_layer != default_layer_state) {
+        last_default_layer = default_layer_state;
+        layer_move(get_highest_layer(default_layer_state));
+    }
 }
 
 #if defined(RGB_MATRIX_ENABLE)

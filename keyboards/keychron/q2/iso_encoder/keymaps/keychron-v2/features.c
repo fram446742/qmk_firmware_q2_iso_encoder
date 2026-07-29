@@ -69,23 +69,7 @@ static void feature_apply_all(void) {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 void features_init(void) {
-    // TEMP FORCE-TEST: skip EEPROM, use hardcoded values
-    // Remove the following block and uncomment the normal init below
-    g_feature_flags = 0x05;  // TapDance + CapsWord ON
-    eeprom_tap_count = 3;
-    eeprom_tap[0] = (eeprom_tap_t){.base_kc=KC_BSPC,.tap_kc=KC_BSPC,.dbl_type=TD_DBL_KEYCODE,.dbl_val=KC_DEL};
-    eeprom_tap[1] = (eeprom_tap_t){.base_kc=KC_ESC, .tap_kc=KC_ESC, .dbl_type=TD_DBL_KEYCODE,.dbl_val=CW_TOGG};
-    eeprom_tap[2] = (eeprom_tap_t){.base_kc=KC_E,   .tap_kc=KC_E,   .dbl_type=TD_DBL_UNICODE_STR,.dbl_val=0x82E2,.dbl_extra=0x00AC};
-    eeprom_combo_count = 1;
-    eeprom_combos[0].keys[0] = KC_O;
-    eeprom_combos[0].keys[1] = KC_P;
-    eeprom_combos[0].output  = 0x5F11;
-    eeprom_leader_count = 2;
-    eeprom_leaders[0] = (eeprom_leader_t){.seq={KC_W}, .mod=MOD_LGUI, .key=KC_W};
-    eeprom_leaders[1] = (eeprom_leader_t){.seq={KC_Q}, .mod=MOD_LGUI, .key=KC_Q};
-    feature_apply_all();
-#if 0
-    // ── Normal init (restore when force-test above is removed) ──────────
+    // Load persisted flags
     g_feature_flags = eeprom_read_byte((const uint8_t *)FEATURES_EEPROM_ADDR);
 
     // If EEPROM was erased (all 0xFF), treat as default config
@@ -101,7 +85,6 @@ void features_init(void) {
 
     // Apply to hardware
     feature_apply_all();
-#endif
 }
 
 void features_save(void) {
