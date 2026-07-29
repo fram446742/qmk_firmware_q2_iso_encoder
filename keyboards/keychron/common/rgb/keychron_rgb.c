@@ -125,6 +125,21 @@ void eeconfig_init_custom_rgb(void) {
     eeprom_read_block(per_key_led, OFFSET_PER_KEY_RGBS, sizeof(per_key_led));
     // Load mixed rgb
     eeprom_read_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
+    /* Detect uninitialized (all 0xFF) or Vial-default (all 0x00) regions[]
+     * and seed from default_region. Without this, the first boot after flash
+     * leaves rgb_regions[] all zero, and mix-RGB zone 1 paints nothing
+     * because rgb_matrix_region_set_color checks rgb_regions[i] == 1 for
+     * every LED and never matches. */
+    {
+        bool needs_default = true;
+        for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+            if (regions[i] != 0xFF && regions[i] != 0x00) { needs_default = false; break; }
+        }
+        if (needs_default) {
+            memcpy(regions, default_region, RGB_MATRIX_LED_COUNT);
+            eeprom_update_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
+        }
+    }
     eeprom_read_block(effect_list, OFFSET_EFFECT_LIST, sizeof(effect_list));
     /* Mirror regions into rgb_regions so the per-key RGB effect has
      * valid region data even before the Vial/Launcher app pushes HID. */

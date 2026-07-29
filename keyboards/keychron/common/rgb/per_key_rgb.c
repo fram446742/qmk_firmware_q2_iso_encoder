@@ -34,7 +34,7 @@ bool per_key_rgb_solid(effect_params_t *params) {
         hsv     = per_key_led[i];
         hsv.v   = rgb_matrix_config.hsv.v;
         RGB rgb = hsv_to_rgb(hsv);
-        rgb_matrix_region_set_color(params->region, i, rgb.r, rgb.g, rgb.b);
+        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
 }
@@ -49,7 +49,7 @@ bool per_key_rgb_breahting(effect_params_t *params) {
         hsv.v   = scale8(abs8(sin8(time) - 128) * 2, rgb_matrix_config.hsv.v);
         RGB rgb = hsv_to_rgb(hsv);
         RGB_MATRIX_TEST_LED_FLAGS();
-        rgb_matrix_region_set_color(params->region, i, rgb.r, rgb.g, rgb.b);
+        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
 
     return rgb_matrix_check_finished_leds(led_max);
@@ -80,7 +80,7 @@ bool per_key_rgb_reactive_simple(effect_params_t *params) {
         //     hsv.v = per_key_led[i].v;
 
         RGB rgb = hsv_to_rgb(hsv);
-        rgb_matrix_region_set_color(params->region, i, rgb.r, rgb.g, rgb.b);
+        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
 }
@@ -108,7 +108,7 @@ bool per_key_rgb_effect_runner_reactive_splash(uint8_t start, effect_params_t *p
         // if (per_key_led[i].v < hsv.v)
         //    hsv.v = per_key_led[i].v;
         RGB rgb = hsv_to_rgb(hsv);
-        rgb_matrix_region_set_color(params->region, i, rgb.r, rgb.g, rgb.b);
+        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
 }
