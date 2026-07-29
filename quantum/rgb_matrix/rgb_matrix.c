@@ -39,14 +39,22 @@ __attribute__((weak)) rgb_t rgb_matrix_hsv_to_rgb(hsv_t hsv) {
 }
 
 // Generic effect runners
-#include "rgb_matrix_runners.inc"
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_runners.inc"
+#else
+#    include "rgb_matrix_runners.inc"
+#endif
 
 // ------------------------------------------
 // -----Begin rgb effect includes macros-----
 #define RGB_MATRIX_EFFECT(name)
 #define RGB_MATRIX_CUSTOM_EFFECT_IMPLS
 
-#include "rgb_matrix_effects.inc"
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
+#else
+#    include "rgb_matrix_effects.inc"
+#endif
 #ifdef COMMUNITY_MODULES_ENABLE
 #    include "rgb_matrix_community_modules.inc"
 #endif
@@ -65,7 +73,11 @@ __attribute__((weak)) rgb_t rgb_matrix_hsv_to_rgb(hsv_t hsv) {
 // Non-static effect wrappers for custom keyboard code (mixed_rgb.c, per_key_rgb.c)
 #define RGB_MATRIX_EFFECT(name, ...) \
     __attribute__((unused)) bool kc_effect_##name(effect_params_t *params) { return name(params); }
-#include "rgb_matrix_effects.inc"
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
+#else
+#    include "rgb_matrix_effects.inc"
+#endif
 #undef RGB_MATRIX_EFFECT
 
 // globals
@@ -376,7 +388,11 @@ static void rgb_task_render(uint8_t effect) {
     case RGB_MATRIX_##name:                   \
         rendering = name(&rgb_effect_params); \
         break;
-#include "rgb_matrix_effects.inc"
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
+#else
+#    include "rgb_matrix_effects.inc"
+#endif
 #undef RGB_MATRIX_EFFECT
 
 #ifdef COMMUNITY_MODULES_ENABLE
@@ -857,7 +873,11 @@ const char *rgb_matrix_get_mode_name(uint8_t mode) {
 #    define RGB_MATRIX_EFFECT(name, ...) \
         case RGB_MATRIX_##name:          \
             return #name;
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_effects.inc"
+#else
 #    include "rgb_matrix_effects.inc"
+#endif
 #    undef RGB_MATRIX_EFFECT
 
 #    ifdef COMMUNITY_MODULES_ENABLE

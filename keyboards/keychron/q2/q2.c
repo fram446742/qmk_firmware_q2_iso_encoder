@@ -15,6 +15,9 @@
  */
 
 #include "keychron.h"
+#include "keychron_rgb_type.h"
+
+extern os_indicator_config_t os_ind_cfg;
 
 #ifdef DIP_SWITCH_ENABLE
 bool dip_switch_update_kb(uint8_t index, bool active) {
@@ -44,11 +47,18 @@ void keyboard_post_init_kb(void) {
 bool rgb_matrix_indicators_advanced_kb(uint8_t led_min, uint8_t led_max) {
     if (!rgb_matrix_indicators_advanced_user(led_min, led_max)) { return false; }
 
-    if (host_keyboard_led_state().caps_lock) {
-        RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 255, 255, 255);
-    } else {
-        if (!rgb_matrix_get_flags()) {
-            RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 0, 0, 0);
+    /* Honor the Launcher's caps-lock LED enable/disable toggle.
+     * The strong os_state_indicate() in keychron_rgb.c (called when no RGB
+     * effect is active) already gates on os_ind_cfg.disable.caps_lock, but
+     * this code path runs whenever an effect IS active, so the toggle was
+     * silently ignored while any effect was rendering. */
+    if (!os_ind_cfg.disable.caps_lock) {
+        if (host_keyboard_led_state().caps_lock) {
+            RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 255, 255, 255);
+        } else {
+            if (!rgb_matrix_get_flags()) {
+                RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 0, 0, 0);
+            }
         }
     }
     return true;
