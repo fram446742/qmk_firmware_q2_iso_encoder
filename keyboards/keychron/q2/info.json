@@ -31,8 +31,8 @@
     "eeprom": {
         "wear_leveling": {
             "driver": "embedded_flash",
-            "logical_size": 3072,
-            "backing_size": 6144
+            "logical_size": 8192,
+            "backing_size": 16384
         }
     },
     "dynamic_keymap": {
