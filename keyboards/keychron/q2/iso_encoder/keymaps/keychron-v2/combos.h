@@ -11,6 +11,9 @@
 // Our codes start at NEW_SAFE_RANGE (defined in q2/keycodes_custom.h).
 
 enum feature_keycodes {
+    // Toggle keycodes — handled in process_record_user()
+    // Only KC_FEAT_OVERVIEW is active by default.  The others are reserved for
+    // future custom-keycode assignments (combos commented out in combos.c).
     KC_AUTOSHIFT_TOGGLE = NEW_SAFE_RANGE,
     KC_TAP_DANCE_TOGGLE,
     KC_CAPS_WORD_TOGGLE,
@@ -27,21 +30,18 @@ enum feature_keycodes {
 // key_combos[] is defined in combos.c (included from keymap.c).
 //
 // Navigational combos (A+S=ESC, J+K=BSPC, K+L=DEL) are in the source but
-// commented out — the base layer already has these keys.  Uncomment in
-// combos.c if you want simultaneous-press shortcuts.
+// commented out — the base layer already has these keys.
+//
+// Feature-toggle combos (Z+X for AutoShift, etc.) are also commented out.
+// Toggles are now done inside the feature overview: press O+P, then tap
+// the indicator key to toggle (e.g. A toggles Auto-Shift).
 
 enum combo_events {
-    // (navigational combos commented out — see combos.c)
+    // Navigational (commented out — see combos.c)
+    CB_ESC,
+    CB_BSPC,
+    CB_DEL,
 
-    // Toggles — fires custom keycode, handled in process_record_user()
-    CB_TOG_AUTOSHIFT,  // Z + X        → toggle auto-shift
-    CB_TOG_TAP_DANCE,  // LEFT + RIGHT → toggle tap-dance
-    CB_TOG_CAPS_WORD,  // C + V        → toggle caps-word processing
-    CB_TOG_REPEAT_KEY, // R + T        → toggle repeat-key processing
-    CB_TOG_DYN_MACRO,  // D + F        → toggle dynamic-macro processing
-    CB_TOG_LEADER,     // L + ;        → toggle leader-key processing
-    CB_TOG_NKRO,       // SPC + RSFT   → toggle NKRO
-
-    // Display
-    CB_FEAT_OVERVIEW,  // O + P        → show feature status overview
+    // Overview (the only active combo)
+    CB_FEAT_OVERVIEW,
 };

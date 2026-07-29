@@ -11,16 +11,17 @@ static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
 
-#define OVERVIEW_TIMEOUT_MS 2000
+// Configurable overview duration (ms).  Set to 0 for no timeout.
+#define OVERVIEW_TIMEOUT_MS 10000
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-// Map the highest active layer to the matching number-key LED.
+// Show the default base layer.  default_layer_state tracks Mac (0) vs Win (1).
 // Layer 0 → key "0" (LED 10), layer 1 → key "1" (LED 1), layer N→key N (LED N).
 static uint8_t layer_to_led(uint8_t layer) {
-    if (layer == 0) return 10;  // key "0" is at the end of the number row
-    if (layer >= 1 && layer <= 8) return layer;  // keys "1"–"8"
-    return 255;  // no mapping (layer > 8)
+    if (layer == 0) return 10;
+    if (layer >= 1 && layer <= 8) return layer;
+    return 255;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -48,6 +49,12 @@ void feature_overview_cancel(void) {
     rgb_matrix_config.enable = saved_rgb_enabled;
 }
 
+void feature_overview_reset_timer(void) {
+    if (overview_active) {
+        overview_start = timer_read32();
+    }
+}
+
 // ── Per-frame drawing ───────────────────────────────────────────────────────
 
 void indicator_draw(void) {
@@ -57,8 +64,9 @@ void indicator_draw(void) {
     rgb_matrix_set_color_all(0, 0, 0);
 
     // ── Active-layer indicator ──────────────────────────────────────────
-    // Light the number key matching the current active layer.
-    uint8_t layer = get_highest_layer(layer_state);
+    // Light the number key matching the current default (base) layer.
+    // default_layer_state tracks Mac (layer 0) vs Windows (layer 1).
+    uint8_t layer = get_highest_layer(default_layer_state);
     uint8_t led   = layer_to_led(layer);
     if (led < RGB_MATRIX_LED_COUNT) {
         rgb_matrix_set_color(led, 255, 255, 255);  // white

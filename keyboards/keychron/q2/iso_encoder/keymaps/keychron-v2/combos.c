@@ -9,35 +9,33 @@
 #include "indicators.h"
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Navigation shortcuts (COMMENTED OUT — uncomment if desired)
+// Navigation shortcuts (COMMENTED OUT)
 // ═════════════════════════════════════════════════════════════════════════════
-// These combos fire when the listed keys are pressed simultaneously.
-// They're commented because the base layer already has dedicated keys.
 //
-// const uint16_t PROGMEM cb_esc_combo[]  = {KC_A, KC_S, COMBO_END};  // A+S→ESC
-// const uint16_t PROGMEM cb_bspc_combo[] = {KC_J, KC_K, COMBO_END};  // J+K→BSPC
-// const uint16_t PROGMEM cb_del_combo[]  = {KC_K, KC_L, COMBO_END};  // K+L→DEL
+// const uint16_t PROGMEM cb_esc_combo[]  = {KC_A, KC_S, COMBO_END};
+// const uint16_t PROGMEM cb_bspc_combo[] = {KC_J, KC_K, COMBO_END};
+// const uint16_t PROGMEM cb_del_combo[]  = {KC_K, KC_L, COMBO_END};
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Feature toggles
+// Feature toggles (COMMENTED OUT — done via overview now)
 // ═════════════════════════════════════════════════════════════════════════════
-
-const uint16_t PROGMEM cb_tog_autoshift[]   = {KC_Z, KC_X, COMBO_END};           // Z+X:       AutoShift
-const uint16_t PROGMEM cb_tog_tap_dance[]   = {KC_LEFT, KC_RGHT, COMBO_END};    // LEFT+RGHT: Tap Dance
-const uint16_t PROGMEM cb_tog_caps_word[]   = {KC_C, KC_V, COMBO_END};           // C+V:       Caps Word
-const uint16_t PROGMEM cb_tog_repeat_key[]  = {KC_R, KC_T, COMBO_END};           // R+T:       Repeat Key
-const uint16_t PROGMEM cb_tog_dyn_macro[]   = {KC_D, KC_F, COMBO_END};           // D+F:       Dyn Macro
-const uint16_t PROGMEM cb_tog_leader[]      = {KC_L, KC_SCLN, COMBO_END};        // L+;:       Leader Key
-const uint16_t PROGMEM cb_tog_nkro[]        = {KC_SPC, KC_RSFT, COMBO_END};     // SPC+RSFT:  NKRO
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Display
-// ═════════════════════════════════════════════════════════════════════════════
-
-const uint16_t PROGMEM cb_feat_overview[]   = {KC_O, KC_P, COMBO_END};  // O+P: Overview
+//
+// const uint16_t PROGMEM cb_tog_autoshift[]   = {KC_Z, KC_X, COMBO_END};
+// const uint16_t PROGMEM cb_tog_tap_dance[]   = {KC_LEFT, KC_RGHT, COMBO_END};
+// const uint16_t PROGMEM cb_tog_caps_word[]   = {KC_C, KC_V, COMBO_END};
+// const uint16_t PROGMEM cb_tog_repeat_key[]  = {KC_R, KC_T, COMBO_END};
+// const uint16_t PROGMEM cb_tog_dyn_macro[]   = {KC_D, KC_F, COMBO_END};
+// const uint16_t PROGMEM cb_tog_leader[]      = {KC_L, KC_SCLN, COMBO_END};
+// const uint16_t PROGMEM cb_tog_nkro[]        = {KC_SPC, KC_RSFT, COMBO_END};
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Combo table — fires custom keycodes, handled in process_record_user()
+// Display (the only active combo)
+// ═════════════════════════════════════════════════════════════════════════════
+
+const uint16_t PROGMEM cb_feat_overview[]   = {KC_O, KC_P, COMBO_END};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Combo table
 // ═════════════════════════════════════════════════════════════════════════════
 
 combo_t key_combos[] = {
@@ -46,15 +44,6 @@ combo_t key_combos[] = {
     // [CB_BSPC]          = COMBO(cb_bspc_combo,      KC_BSPC),
     // [CB_DEL]           = COMBO(cb_del_combo,       KC_DEL),
 
-    // Feature toggles
-    [CB_TOG_AUTOSHIFT]   = COMBO(cb_tog_autoshift,   KC_AUTOSHIFT_TOGGLE),
-    [CB_TOG_TAP_DANCE]   = COMBO(cb_tog_tap_dance,   KC_TAP_DANCE_TOGGLE),
-    [CB_TOG_CAPS_WORD]   = COMBO(cb_tog_caps_word,   KC_CAPS_WORD_TOGGLE),
-    [CB_TOG_REPEAT_KEY]  = COMBO(cb_tog_repeat_key,  KC_REPEAT_KEY_TOGGLE),
-    [CB_TOG_DYN_MACRO]   = COMBO(cb_tog_dyn_macro,   KC_DYN_MACRO_TOGGLE),
-    [CB_TOG_LEADER]      = COMBO(cb_tog_leader,      KC_LEADER_TOGGLE),
-    [CB_TOG_NKRO]        = COMBO(cb_tog_nkro,        KC_NKRO_TOGGLE),
-
-    // Overview
+    // Overview (the only active entry)
     [CB_FEAT_OVERVIEW]   = COMBO(cb_feat_overview,   KC_FEAT_OVERVIEW),
 };

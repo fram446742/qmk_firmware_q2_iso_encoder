@@ -15,9 +15,6 @@ KEY_OVERRIDE_ENABLE = yes
 # Repeat / Alt-Repeat keys
 REPEAT_KEY_ENABLE = yes
 
-# Tap-dance: multi-tap on a single key
-TAP_DANCE_ENABLE = yes
-
 # Combos: multiple simultaneous keys = action
 COMBO_ENABLE = yes
 

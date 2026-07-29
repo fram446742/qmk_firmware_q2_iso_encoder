@@ -104,6 +104,7 @@
 void feature_overview_trigger(void);
 bool feature_overview_is_active(void);
 void feature_overview_cancel(void);
+void feature_overview_reset_timer(void);  // extend by OVERVIEW_TIMEOUT_MS from now
 
 // Called from rgb_matrix_indicators_user() each frame.
 void indicator_draw(void);
