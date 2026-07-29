@@ -3,14 +3,15 @@
 
 #include "indicators.h"
 #include "features.h"
-#include "rgb_matrix.h"
-#include "timer.h"
+#include "quantum.h"     // keymap_config_t, rgb_matrix_*, timer_*
 
 // ── Overview state ──────────────────────────────────────────────────────────
 static bool     overview_active   = false;
 static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
+
+// keymap_config (for keymap_config.nkro) is provided by quantum.h
 
 #define OVERVIEW_TIMEOUT_MS 2000
 
@@ -58,11 +59,25 @@ void indicator_draw(void) {
     // Active features → white (255,255,255)
     // Inactive features → very dim gray (5,5,5) so position is visible
 
-    // Auto-shift
+    // Caps Lock (on Caps Lock key)
+    if (host_keyboard_led_state().caps_lock) {
+        rgb_matrix_set_color(IND_CAPS_LOCK, 255, 255, 255);
+    } else {
+        rgb_matrix_set_color(IND_CAPS_LOCK, 5, 5, 5);
+    }
+
+    // Auto-shift (on A key)
     if (feature_auto_shift()) {
-        rgb_matrix_set_color(IND_AUTO_SHIFT, 255, 255, 255);
+        rgb_matrix_set_color(IND_AUTO_SHIFT, 0, 255, 0);
     } else {
         rgb_matrix_set_color(IND_AUTO_SHIFT, 5, 5, 5);
+    }
+
+    // NKRO (on N key)
+    if (keymap_config.nkro) {
+        rgb_matrix_set_color(IND_NKRO, 255, 255, 255);
+    } else {
+        rgb_matrix_set_color(IND_NKRO, 5, 5, 5);
     }
 }
 

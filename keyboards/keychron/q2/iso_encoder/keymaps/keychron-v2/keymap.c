@@ -1,17 +1,117 @@
 /* Copyright 2023 ~ 2025 @ Keychron (https://www.keychron.com)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * Keychron Q2 ISO Encoder — VIA-enabled keymap with extended features
+ * ═════════════════════════════════════════════════════════════════════════════
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * LAYERS
+ * ──────                                                                    
+ * 8 layers: MAC_BASE / WIN_BASE / MAC_FN1 / WIN_FN1 / _FN2 / _FN3 / _FN4 / _FN5
+ * - First 5 have default key assignments; _FN3–_FN5 are blank (configurable
+ *   via VIA).  FN1 triggers MAC_FN1 (Mac) or WIN_FN1 (Win) depending on base.
+ * - Base layers have tap-dance versions of Esc and Backspace (see below).
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * TAP DANCE  (TAP_DANCE_ENABLE)
+ * ─────────
+ *  TD_BSPC_DEL (TD index 0, keycode 0x5700)
+ *    Single tap  → Backspace
+ *    Double tap  → Delete
+ *    └─ Note: the single-tap feels slightly delayed (tapping-term wait to
+ *       distinguish tap vs double-tap).  You can shorten it by adding
+ *       `#define TAPPING_TERM 150` in config.h (default is 200ms).
+ *
+ *  TD_ESC_CAPS (TD index 1, keycode 0x5701)
+ *    Single tap  → Escape
+ *    Double tap  → Caps-Word toggle (auto-disables after a non-alpha key)
+ *
+ *  VIA/Launcher shows these as 0x5700 / 0x5701 (QK_TAP_DANCE base).
+ *  This is a VIA protocol limitation — the app can't name dynamic TD codes.
+ *
+ * COMBOS  (COMBO_ENABLE)
+ * ──────
+ *  Z  +  X          → Toggle Auto-Shift on/off
+ *  SPC + Right Shift → Toggle NKRO on/off
+ *  O  +  P          → Show feature overview (LED status display)
+ *
+ *  (A+S=Esc, J+K=Bspc, K+L=Del are in combos.c but commented out — they're
+ *   redundant with the base layer keys and cost flash space.)
+ *
+ * AUTO-SHIFT  (AUTO_SHIFT_ENABLE)
+ * ──────────
+ *  Long-press any alpha/key → shifted variant (e.g. hold 'a' → 'A').
+ *  Toggle with Z+X combo or assign KC_AUTOSHIFT_TOGGLE in VIA.
+ *  State is saved to EEPROM and restored on power-on.
+ *
+ * NKRO  (built-in, toggled via keymap_config.nkro)
+ * ────
+ *  Toggle with SPC+RSFT combo or assign KC_NKRO_TOGGLE in VIA.
+ *  NKRO state is persisted by QMK core via eeconfig.
+ *
+ * KEY OVERRIDES  (KEY_OVERRIDE_ENABLE)
+ * ──────────────
+ *  Not active by default.  See combos.c for a commented example.
+ *  Uncomment to map Shift + [ISO key left of Z] → Tilde.
+ *
+ * LEADER KEY  (LEADER_ENABLE)
+ * ──────────
+ *  Press FN2 + Q to start a leader sequence, then one of:
+ *    W/Q/S/F/A/C/V/X/Z/T → platform-aware Cmd/Ctrl+{key}
+ *  Mac layers send Cmd, Windows layers send Ctrl.
+ *
+ * OTHER ENABLED FEATURES (assign keycodes in VIA)
+ * ─────────────────────
+ *  Caps Word      CW_TOGG (or double-tap Esc via tap dance)
+ *  Layer Lock     QK_LAYER_LOCK
+ *  Repeat Key     QK_REP / QK_ALT_REP
+ *  Dynamic Macro  QK_DYNAMIC_MACRO_1 / _2  (record live, no VIA needed)
+ *  Unicode        UC(0xNNNN)
+ *
+ * FEATURE OVERVIEW
+ * ────────────────
+ *  Press O+P → all LEDs go black, then shows:
+ *    A key green  = Auto-Shift ON   |  A key dim = Auto-Shift OFF
+ *    N key white  = NKRO ON          |  N key dim = NKRO OFF
+ *  Overview auto-cancels after 2 seconds or on next keypress.
+ *  Normal RGB effect is restored afterward.
+ *
+ * EEPROM LAYOUT
+ * ─────────────
+ *  Byte 8100 (1 byte): feature toggle bitmask
+ *    bit 0 = Auto-Shift enable
+ *    bits 1-7 = reserved
+ *  First boot (erased EEPROM = 0xFF) defaults all features OFF.
+ *  Changing EEPROM layout requires a reflash + EEPROM clear.
+ *
+ * KEYCODE NAMES IN VIA / KEYCHRON LAUNCHER
+ * ────────────────────────────────────────
+ *  Tap dance codes (0x57xx) and custom keycodes (0x5Fxx) appear as raw
+ *  hex values. This is a VIA protocol limitation — dynamic keycodes can't
+ *  be named in the keyboard definition.  They still work correctly.
+ *
+ * TROUBLESHOOTING
+ * ───────────────
+ *  - Backspace feels slow?  That's the tap-dance tapping term.  Lower
+ *    TAPPING_TERM (e.g. 150) in config.h or replace TD(TD_BSPC_DEL) with
+ *    plain KC_BSPC on the base layers.
+ *  - Combos not firing?  Make sure all combo keys are pressed within the
+ *    50ms COMBO_TERM window — press them simultaneously, not sequentially.
+ *  - Feature overview not showing?  Make sure RGB matrix is enabled
+ *    (VIA lighting tab → any effect selected).
+ *  - Build errors after editing combos.c?  The file is #included from
+ *    keymap.c, so it's in the same translation unit as keymap_introspection.
+ *    Don't add combos.c to SRC in rules.mk (it's already handled).
+ *
+ * BITWISE vs BITFIELD
+ * ────────────────────
+ *  Feature flags use explicit `uint8_t` bitwise ops rather than a struct of
+ *  bitfields.  Both compile to identical machine code.  The explicit style
+ *  wins here because:
+ *    1. Direct byte read/write to EEPROM (no union cast needed)
+ *    2. Atomic toggle with a single XOR:  flags ^= (1 << N)
+ *    3. No padding/endianness surprises across compiler versions
+ *    4. Bitwise AND/OR for batch operations:  flags & (A|B|C)
+ *  So yes, explicit bitwise IS worth it for this use case.
  */
 
 #include QMK_KEYBOARD_H
@@ -217,6 +317,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 #ifdef COMBO_ENABLE
             case KC_AUTOSHIFT_TOGGLE:
                 feature_toggle_auto_shift();
+                return false;
+            case KC_NKRO_TOGGLE:
+                clear_keyboard();
+                keymap_config.nkro = !keymap_config.nkro;
                 return false;
             case KC_FEAT_OVERVIEW:
                 feature_overview_trigger();
