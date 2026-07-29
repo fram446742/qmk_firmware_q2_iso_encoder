@@ -122,6 +122,7 @@
 #include "features.h"
 #include "indicators.h"
 #include "combos.h"
+#include "action_layer.h"    // layer_invert
 
 // =============================================================================
 // Layers
@@ -151,128 +152,120 @@ enum layers {
 // and custom behaviours can be added without touching QMK core.
 //
 // To add a new tap dance:
-//   1. Add an enum entry
-//   2. Add a user_data array with {tap_kc, double_tap_kc}
-//   3. Add the array address to tap_dance_actions[] with CUSTOM_TD_DOUBLE
-//   4. Use TD(MY_NEW) in the keymaps
+// ═════════════════════════════════════════════════════════════════════════════
+// Transparent tap-dance override  (no QMK TAP_DANCE_ENABLE needed)
+// ═════════════════════════════════════════════════════════════════════════════
+// Intercepts base-layer keycodes and provides tap/double-tap behavior
+// WITHOUT modifying the keymap or using TD() codes.
+// The keymap keeps plain KC_BSPC, KC_ESC, KC_E — this layer sits on top.
 //
-// Example already added: TD_E_EURO — tap=E, double=€
+// When the feature flag is OFF, the keys work normally.
+// When ON, the timer-based state machine detects double taps.
+//
+// To add a new override, add an entry to tap_overrides[] below.
+// Each base_kc can appear at most once.  Duplicate base_kc entries
+// (e.g. KC_LBRC for both "{" and "[") must be resolved by commenting one.
 
-#ifdef TAP_DANCE_ENABLE
+// ── Override config ─────────────────────────────────────────────────────
 
-// ── Types ─────────────────────────────────────────────────────────────────
-
-// Data for CUSTOM_TD_DOUBLE_UNICODE: single-tap keycode + Unicode string.
 typedef struct {
-    uint16_t     tap_kc;
-    const char  *unicode_str;
-} td_unicode_pair_t;
+    uint16_t     base_kc;     // the key to intercept
+    uint16_t     tap_kc;      // sent on single tap
+    uint16_t     dbl_kc;      // sent on double tap (0 = use unicode)
+    const char  *unicode;     // Unicode string for double tap (NULL = use dbl_kc)
+} tap_override_t;
 
-// ── Custom pair callbacks ───────────────────────────────────────────────
+static const tap_override_t PROGMEM tap_overrides[] = { // base,             tap,      dbl,       unicode
+    {KC_BSPC,           KC_BSPC,  KC_DEL,    NULL},     // Bspc → Del
+    {KC_ESC,            KC_ESC,   CW_TOGG,   NULL},     // Esc → CapsWord
+    {KC_E,              KC_E,     0,         "€"},      //  e → €
+    {KC_2,              KC_2,     0,         "@"},      //  2 → @
+    {KC_3,              KC_3,     0,         "#"},      //  3 → #
+    {KC_5,              KC_5,     0,         "½"},      //  5 → ½
+    {KC_6,              KC_6,     0,         "¬"},      //  6 → ¬
+    {KC_GRV,            KC_GRV,   0,         "~"},      //  ` → ~
+    {KC_BSLS,           KC_BSLS,  0,         "|"},      //  \ → |
+    {KC_LBRC,           KC_LBRC,  0,         "{"},     //  [ → {
+    //{KC_LBRC,          KC_LBRC,  0,         "["},     //  DUPLICATE: same key as "{"
+    {KC_RBRC,           KC_RBRC,  0,         "}"},     //  ] → }
+    //{KC_RBRC,          KC_RBRC,  0,         "]"},     //  DUPLICATE: same key as "}"
+    {KC_NUBS,           KC_NUBS,  0,         "\\"},     // NuBS to backslash
+    //{KC_NUBS,          KC_NUBS,  0,         "¸"},     //  DUPLICATE: same key as backslash
+};
 
-static void td_double_finished(tap_dance_state_t *state, void *user_data) {
-    tap_dance_pair_t *pair = (tap_dance_pair_t *)user_data;
-    uint16_t kc = (state->count == 1) ? pair->kc1 : pair->kc2;
+// ── State ───────────────────────────────────────────────────────────────
 
-    // Unicode codepoints (0x8000-0xBFFF range from UC() macro) need
-    // register_unicode() to go through the OS input method.  tap_code16()
-    // bypasses the Unicode processing pipeline and sends raw HID codes.
-    if (kc >= QK_UNICODE && kc <= QK_UNICODE_MAX) {
-        register_unicode(kc & 0x7FFF);
-    } else {
+static int8_t   tap_pending_idx = -1;   // index into tap_overrides[], -1 = none
+static uint16_t tap_timer       = 0;
+
+#define TAP_TERM 200  // ms — same as QMK's default tapping term
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+static void tap_fire_override(const tap_override_t *ov) {
+    uint16_t dbl = pgm_read_word(&ov->dbl_kc);
+    const char *uni = ov->unicode;  // PROGMEM pointer, safe to read
+    if (uni) {
+        send_unicode_string(uni);
+    } else if (dbl) {
+        tap_code16(dbl);
+    }
+}
+
+// ── Main processing (called from process_record_user) ────────────────────
+
+static bool process_tap_override(uint16_t keycode, keyrecord_t *record) {
+    for (int i = 0; i < ARRAY_SIZE(tap_overrides); i++) {
+        if (keycode == pgm_read_word(&tap_overrides[i].base_kc)) {
+            if (record->event.pressed) {
+                uint16_t now = timer_read();
+
+                // Double tap?
+                if (tap_pending_idx == i && timer_elapsed(tap_timer) <= TAP_TERM) {
+                    tap_pending_idx = -1;
+                    tap_fire_override(&tap_overrides[i]);
+                    return false;
+                }
+
+                // Different key or timeout — fire pending single if any
+                if (tap_pending_idx >= 0) {
+                    uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
+                    tap_code16(base);
+                    tap_pending_idx = -1;
+                }
+
+                // Start new pending tap
+                tap_pending_idx = i;
+                tap_timer       = now;
+                return false;  // consume press
+            } else {
+                // Release: consume if still this key's pending release
+                if (tap_pending_idx == i) {
+                    return false;  // timer will fire the tap
+                }
+                return true;
+            }
+        }
+    }
+    // Not an overridden key — fire any pending tap then let it through
+    if (tap_pending_idx >= 0) {
+        uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
+        tap_code16(base);
+        tap_pending_idx = -1;
+    }
+    return true;  // let QMK process normally
+}
+
+// ── Periodic task (called from matrix_scan_user) ─────────────────────────
+
+static void tap_override_task(void) {
+    if (tap_pending_idx >= 0 && timer_elapsed(tap_timer) > TAP_TERM) {
+        int8_t idx = tap_pending_idx;
+        tap_pending_idx = -1;
+        uint16_t kc = pgm_read_word(&tap_overrides[idx].tap_kc);
         tap_code16(kc);
     }
-
-    reset_tap_dance(state);
 }
-
-static void td_double_reset(tap_dance_state_t *state, void *user_data) {
-    // No cleanup needed — td_double_finished / td_double_str_finished
-    // already do press+release and call reset_tap_dance(state).
-    // Calling reset_tap_dance again here would recurse forever.
-}
-
-// ── Unicode-string callback ─────────────────────────────────────────────
-
-static void td_double_str_finished(tap_dance_state_t *state, void *user_data) {
-    td_unicode_pair_t *pair = (td_unicode_pair_t *)user_data;
-    if (state->count == 1) {
-        tap_code16(pair->tap_kc);
-    } else {
-        send_unicode_string(pair->unicode_str);
-    }
-    reset_tap_dance(state);
-}
-
-// ── Helper macros ───────────────────────────────────────────────────────
-
-// For regular keycode pairs:  CUSTOM_TD_DOUBLE(KC_BSPC, KC_DEL)
-#define CUSTOM_TD_DOUBLE(kc1, kc2)                                          \
-    { .fn = {NULL, td_double_finished, td_double_reset, NULL},               \
-      .user_data = (void *)&((tap_dance_pair_t){kc1, kc2}) }
-
-// For Unicode string double-actions:  CUSTOM_TD_DOUBLE_UNICODE(KC_E, "€")
-// Works on any OS (Linux IBus, Win Alt-code, Mac Hex Input).
-#define CUSTOM_TD_DOUBLE_UNICODE(kc1, str)                                  \
-    { .fn = {NULL, td_double_str_finished, td_double_reset, NULL},           \
-      .user_data = (void *)&((td_unicode_pair_t){kc1, str}) }
-
-// (We use the built-in td_double_reset from QMK — no custom reset needed.)
-
-// ── Enum ────────────────────────────────────────────────────────────────
-
-enum {
-    TD_BSPC_DEL,       // tap = Backspace,  double-tap = Delete
-    TD_ESC_CAPS,       // tap = Escape,    double-tap = Caps Word toggle
-    TD_E_EURO,         // tap = e,         double-tap = € (U+20AC)
-    TD_ESC,
-    TD_PIPE,
-    TD_AT,
-    TD_HASH,
-    TD_TILDE,
-    TD_HALF,
-    TD_NOT,
-    TD_LBRACE,
-    TD_LBRACKET,
-    TD_RBRACKET,
-    TD_RBRACE,
-    TD_BACKSLASH,
-    TD_CEDILLA,
-};
-
-// ── Static pair-data arrays (PROGMEM-safe via compound literal in macro) ─
-
-// Three macro patterns available (all shown for reference):
-//
-//   CUSTOM_TD_DOUBLE(KC_BSPC, KC_DEL)           — two regular keycodes
-//   CUSTOM_TD_DOUBLE(KC_ESC,  CW_TOGG)           — keycode + special keycode
-//   CUSTOM_TD_DOUBLE(KC_E,    UC(0x20AC))         — keycode + UC() codepoint
-//   CUSTOM_TD_DOUBLE_UNICODE(KC_E, "€")          — keycode + Unicode string (OS-agnostic)
-//
-// The string variant uses send_unicode_string() which works on all OSes.
-// The UC() variant is OS-dependent (needs correct Unicode input method).
-
-tap_dance_action_t tap_dance_actions[] = {
-    [TD_BSPC_DEL] = CUSTOM_TD_DOUBLE(KC_BSPC,             KC_DEL),
-    [TD_ESC_CAPS] = CUSTOM_TD_DOUBLE(KC_ESC,               CW_TOGG),
-    //[TD_E_EURO] = CUSTOM_TD_DOUBLE(KC_E,              UC(0x20AC)),   // UC() approach
-    [TD_E_EURO]   = CUSTOM_TD_DOUBLE_UNICODE(KC_E,          "€"),       // string approach
-    [TD_ESC] = CUSTOM_TD_DOUBLE_UNICODE(KC_ESC, "ª"),
-    [TD_PIPE] = CUSTOM_TD_DOUBLE_UNICODE(KC_BSLS, "|"),
-    [TD_AT] = CUSTOM_TD_DOUBLE_UNICODE(KC_2, "@"),
-    [TD_HASH] = CUSTOM_TD_DOUBLE_UNICODE(KC_3, "#"),
-    [TD_TILDE] = CUSTOM_TD_DOUBLE_UNICODE(KC_GRV, "~"),
-    [TD_HALF] = CUSTOM_TD_DOUBLE_UNICODE(KC_5, "½"),
-    [TD_NOT] = CUSTOM_TD_DOUBLE_UNICODE(KC_6, "¬"),
-    [TD_LBRACE] = CUSTOM_TD_DOUBLE_UNICODE(KC_7, "{"),
-    [TD_LBRACKET] = CUSTOM_TD_DOUBLE_UNICODE(KC_8, "["),
-    [TD_RBRACKET] = CUSTOM_TD_DOUBLE_UNICODE(KC_9, "]"),
-    [TD_RBRACE] = CUSTOM_TD_DOUBLE_UNICODE(KC_0, "}"),
-    [TD_BACKSLASH] = CUSTOM_TD_DOUBLE_UNICODE(KC_MINS, "\\"),
-    [TD_CEDILLA] = CUSTOM_TD_DOUBLE_UNICODE(KC_EQL, "¸"),
-};
-
-#endif // TAP_DANCE_ENABLE
 
 // =============================================================================
 // Combos — defined in combos.c, #included here so keymap_introspection sees them
@@ -347,14 +340,14 @@ void leader_end_user(void) {
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [MAC_BASE] = LAYOUT_iso_68(
-        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,    KC_MUTE,
+        KC_ESC,   KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,            KC_MUTE,
         KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,                      KC_DEL,
         KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,  KC_NUHS,  KC_ENT,             KC_HOME,
         KC_LSFT,  KC_NUBS,  KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,  KC_UP,
         KC_LCTL,  KC_LOPTN, KC_LCMMD,                               KC_SPC,                                 KC_RCMMD, FN1_MAC,  FN2,      KC_LEFT,  KC_DOWN,  KC_RGHT),
 
     [WIN_BASE] = LAYOUT_iso_68(
-        TD(TD_ESC_CAPS), KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,    KC_MUTE,
+        KC_ESC,   KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,            KC_MUTE,
         KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,                      KC_DEL,
         KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,  KC_NUHS,  KC_ENT,             KC_HOME,
         KC_LSFT,  KC_NUBS,  KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,  KC_UP,
@@ -432,65 +425,82 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // User callbacks — feature toggles, indicators, animation overview
 // =============================================================================
 
-// ── Tap dance runtime fence ────────────────────────────────────────────────
-// When tap dance is DISABLED, intercept ALL TD keycodes before
-// process_tap_dance() sees them and send the plain single-tap keycode.
-// The fence runs in preprocess_record_user which fires BEFORE tap dance.
-//
-// The plain-key fallback table must stay in sync with the enum order.
-
-#if defined(TAP_DANCE_ENABLE) && defined(COMBO_ENABLE)
-
-// Plain-key fallback for each TD index (used when tap dance is disabled).
-// The order/indices must match the TD_ enum in this file.
-static const uint16_t PROGMEM td_plain_fallback[] = {
-    [TD_BSPC_DEL] = KC_BSPC,
-    [TD_ESC_CAPS] = KC_ESC,
-    [TD_E_EURO]   = KC_E,
-};
-
-bool preprocess_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!feature_tap_dance() && IS_QK_TAP_DANCE(keycode)) {
-        uint8_t idx = QK_TAP_DANCE_GET_INDEX(keycode);
-        if (idx < ARRAY_SIZE(td_plain_fallback)) {
-            uint16_t plain = pgm_read_word(&td_plain_fallback[idx]);
-            if (record->event.pressed) {
-                tap_code16(plain);
-            }
-        }
-        return false;  // block all further processing
-    }
-    return true;
-}
-#endif
-
 #if defined(COMBO_ENABLE) || defined(KEY_OVERRIDE_ENABLE)
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // ── Tap-dance override ─────────────────────────────────────────────
+    // Intercepts base keys (KC_BSPC, KC_ESC, KC_E, …) and provides
+    // tap/double-tap behavior when the feature flag is ON.
+    if (feature_tap_dance()) {
+        if (!process_tap_override(keycode, record)) return false;
+    }
+
+    // ── Interactive overview mode ───────────────────────────────────────
+    // Matches on MATRIX POSITION (row, col) — no keycodes involved.
+    // Works from any layer, even if the keymap is completely remapped.
+    // Timer resets on each interactive keypress (10s from last action).
+    if (record->event.pressed && feature_overview_is_active()) {
+        uint8_t r = record->event.key.row;
+        uint8_t c = record->event.key.col;
+        switch ((r << 4) | c) {  // pack row+col into one value
+            // Feature toggles — positions from the base layer layout
+            case (2 << 4) | 1:  // A
+                feature_toggle_auto_shift();    feature_overview_reset_timer(); return false;
+            case (1 << 4) | 5:  // T
+                feature_toggle_tap_dance();     feature_overview_reset_timer(); return false;
+            case (3 << 4) | 4:  // C
+                feature_toggle_caps_word();     feature_overview_reset_timer(); return false;
+            case (1 << 4) | 4:  // R
+                feature_toggle_repeat_key();    feature_overview_reset_timer(); return false;
+            case (2 << 4) | 3:  // D
+                feature_toggle_dyn_macro();     feature_overview_reset_timer(); return false;
+            case (2 << 4) | 9:  // L
+                feature_toggle_leader();        feature_overview_reset_timer(); return false;
+            case (3 << 4) | 7:  // N
+                clear_keyboard();
+                keymap_config.nkro = !keymap_config.nkro;
+                feature_overview_reset_timer();
+                return false;
+
+            // Layer toggles via number row — TG(N)
+            case (0 << 4) | 10:  // 0
+                layer_invert(0); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 1:   // 1
+                layer_invert(1); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 2:   // 2
+                layer_invert(2); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 3:   // 3
+                layer_invert(3); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 4:   // 4
+                layer_invert(4); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 5:   // 5
+                layer_invert(5); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 6:   // 6
+                layer_invert(6); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 7:   // 7
+                layer_invert(7); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 8:   // 8
+                layer_invert(8); feature_overview_reset_timer(); return false;
+            case (0 << 4) | 9:   // 9
+                layer_invert(9); feature_overview_reset_timer(); return false;
+
+            // Any other key → exit overview
+            default:
+                feature_overview_cancel();
+                return false;
+        }
+    }
+
+    // ── Normal processing ───────────────────────────────────────────────
+    // If a tap is pending and a different key is pressed, fire the pending tap
+    if (feature_tap_dance() && tap_pending_idx >= 0) {
+        uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
+        tap_code16(base);
+        tap_pending_idx = -1;
+    }
+
     if (record->event.pressed) {
         switch (keycode) {
 #ifdef COMBO_ENABLE
-            case KC_AUTOSHIFT_TOGGLE:
-                feature_toggle_auto_shift();
-                return false;
-            case KC_TAP_DANCE_TOGGLE:
-                feature_toggle_tap_dance();
-                return false;
-            case KC_NKRO_TOGGLE:
-                clear_keyboard();
-                keymap_config.nkro = !keymap_config.nkro;
-                return false;
-            case KC_CAPS_WORD_TOGGLE:
-                feature_toggle_caps_word();
-                return false;
-            case KC_REPEAT_KEY_TOGGLE:
-                feature_toggle_repeat_key();
-                return false;
-            case KC_DYN_MACRO_TOGGLE:
-                feature_toggle_dyn_macro();
-                return false;
-            case KC_LEADER_TOGGLE:
-                feature_toggle_leader();
-                return false;
             case KC_FEAT_OVERVIEW:
                 feature_overview_trigger();
                 return false;
@@ -507,6 +517,7 @@ void keyboard_post_init_user(void) {
 
 void matrix_scan_user(void) {
     indicator_task();
+    tap_override_task();
 }
 
 #if defined(RGB_MATRIX_ENABLE)
