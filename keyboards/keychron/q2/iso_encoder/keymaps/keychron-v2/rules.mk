@@ -36,3 +36,7 @@ LTO_ENABLE = yes
 # Custom modules for this keymap (feature toggles, indicators)
 SRC += features.c
 SRC += indicators.c
+
+# Auto-generate autocorrect_data.h from typos.txt every build.
+# Edit typos.txt, rebuild — the header is regenerated automatically.
+$(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)

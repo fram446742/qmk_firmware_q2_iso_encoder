@@ -44,81 +44,14 @@ enum layers {
 //
 // To add a new tap dance:
 // ═════════════════════════════════════════════════════════════════════════════
-// Transparent tap-dance override  (no QMK TAP_DANCE_ENABLE needed)
+// Transparent tap-dance override — loads from EEPROM
 // ═════════════════════════════════════════════════════════════════════════════
-// Intercepts base-layer keycodes and provides tap/double-tap behavior
-// WITHOUT modifying the keymap or using TD() codes.
-// The keymap keeps plain KC_BSPC, KC_ESC, KC_E — this layer sits on top.
+// Override definitions now live in EEPROM (features_load_config).
+// The compile-time table below is preserved as reference but NOT compiled.
+// To change defaults, edit features_load_defaults() in features.c.
+// The type td_dbl_type_t and eeprom_tap_t are defined in features.h.
 //
-// When the feature flag is OFF, the keys work normally.
-// When ON, the timer-based state machine detects double taps.
-//
-// To add a new override, add an entry to tap_overrides[] below.
-// Each base_kc can appear at most once.  Duplicate base_kc entries
-// (e.g. KC_LBRC for both "{" and "[") must be resolved by commenting one.
-
-// ── Three mutually exclusive double-tap action types ─────────────────────
-typedef enum {
-    TD_DBL_KEYCODE,     // .dbl_kc: regular QMK keycode (e.g. KC_DEL, CW_TOGG)
-    TD_DBL_UNICODE_STR, // .str:   Unicode string (e.g. "€")
-    TD_DBL_UNICODE_CDP,  // .cdp:    Raw codepoint (e.g. 0x20AC for €)
-} td_dbl_type_t;
-
-typedef struct {
-    uint16_t      base_kc;     // the key to intercept
-    uint16_t      tap_kc;      // sent on single tap
-    td_dbl_type_t dbl_type;    // selects which union member is active
-    union {
-        uint16_t    dbl_kc;   // for TD_DBL_KEYCODE
-        const char *str;      // for TD_DBL_UNICODE_STR
-        uint32_t    cdp;       // for TD_DBL_UNICODE_CDP
-    }; // anonymous union — access directly as ov->dbl_kc / .str / .cdp
-} tap_override_t;
-
-// ── Duplicate check ────────────────────────────────────────────────────────
-#define TAPDUP(kc) TAPDUPCHECK_##kc
-enum {
-    TAPDUP(KC_BSPC) = 0, TAPDUP(KC_ESC)  = 0,
-    TAPDUP(KC_E)    = 0, TAPDUP(KC_2)    = 0,
-    TAPDUP(KC_3)    = 0, TAPDUP(KC_5)    = 0,
-    TAPDUP(KC_6)    = 0, TAPDUP(KC_GRV)  = 0,
-    TAPDUP(KC_BSLS) = 0, TAPDUP(KC_LBRC) = 0,
-    TAPDUP(KC_RBRC) = 0, TAPDUP(KC_NUBS) = 0,
-};
-
-// ── Override table ───────────────────────────────────────────────────────────
-//  TD idx   type         base        tap         action
-//  ───────  ───────────  ──────────  ──────────  ────────────────────────────
-static const tap_override_t PROGMEM tap_overrides[] = {
-    // TD(0x5700)  keycode
-    {.base_kc = KC_BSPC, .tap_kc = KC_BSPC, .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = KC_DEL},
-    // TD(0x5701)  keycode
-    {.base_kc = KC_ESC,  .tap_kc = KC_ESC,  .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = CW_TOGG},
-    // TD(0x5702)  unicode string
-    {.base_kc = KC_E,    .tap_kc = KC_E,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "€"},
-    // TD(0x5703)  unicode string
-    {.base_kc = KC_2,    .tap_kc = KC_2,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "@"},
-    // TD(0x5704)  unicode string
-    {.base_kc = KC_3,    .tap_kc = KC_3,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "#"},
-    // TD(0x5705)  unicode string
-    {.base_kc = KC_5,    .tap_kc = KC_5,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "½"},
-    // TD(0x5706)  unicode string
-    {.base_kc = KC_6,    .tap_kc = KC_6,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "¬"},
-    // TD(0x5707)  unicode string
-    {.base_kc = KC_GRV,  .tap_kc = KC_GRV,  .dbl_type = TD_DBL_UNICODE_STR, .str   = "~"},
-    // TD(0x5708)  unicode string
-    {.base_kc = KC_BSLS, .tap_kc = KC_BSLS, .dbl_type = TD_DBL_UNICODE_STR, .str   = "|"},
-    // TD(0x5709)  unicode string
-    {.base_kc = KC_LBRC, .tap_kc = KC_LBRC, .dbl_type = TD_DBL_UNICODE_STR, .str   = "{"},
-    // TD(0x570A)  unicode string
-    {.base_kc = KC_RBRC, .tap_kc = KC_RBRC, .dbl_type = TD_DBL_UNICODE_STR, .str   = "}"},
-    // TD(0x570B)  unicode string
-    {.base_kc = KC_NUBS, .tap_kc = KC_NUBS, .dbl_type = TD_DBL_UNICODE_STR, .str   = "\\"},
-};
-// An example of each possible double-tap action type.
-//    {KC_ESC,  KC_ESC,  .dbl_type = TD_DBL_KEYCODE,    .dbl_kc = CW_TOGG},
-//    {KC_E,    KC_E,    .dbl_type = TD_DBL_UNICODE_STR, .str   = "€"},
-//    {KC_GRV,  KC_GRV,  .dbl_type = TD_DBL_UNICODE_CDP, .cdp    = 0x007E},
+// ── Old compile-time table (preserved as reference in features.c defaults)
 
 
 
@@ -131,10 +64,12 @@ static uint16_t tap_timer       = 0;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-static void tap_fire_override(const tap_override_t *ov) {
+// ── Helper: fire double-tap from eeprom_tap entry ───────────────────────
+
+static void tap_fire_override(const eeprom_tap_t *ov) {
     switch (ov->dbl_type) {
         case TD_DBL_KEYCODE: {
-            uint16_t kc = ov->dbl_kc;
+            uint16_t kc = ov->dbl_val;
             if (kc >= QK_UNICODE && kc <= QK_UNICODE_MAX) {
                 register_unicode(kc & 0x7FFF);
             } else {
@@ -142,67 +77,65 @@ static void tap_fire_override(const tap_override_t *ov) {
             }
             break;
         }
-        case TD_DBL_UNICODE_STR:
-            send_unicode_string(ov->str);
+        case TD_DBL_UNICODE_STR: {
+            // Reconstruct up to 4 UTF-8 bytes from dbl_val/dbl_extra
+            uint8_t buf[5];
+            buf[0] =  ov->dbl_val       & 0xFF;
+            buf[1] = (ov->dbl_val >> 8) & 0xFF;
+            buf[2] =  ov->dbl_extra     & 0xFF;
+            buf[3] = (ov->dbl_extra >> 8) & 0xFF;
+            buf[4] = 0;
+            send_unicode_string((const char *)buf);
             break;
-        case TD_DBL_UNICODE_CDP:
-            register_unicode(ov->cdp);
+        }
+        case TD_DBL_UNICODE_CP:
+            register_unicode(ov->dbl_val | ((uint32_t)ov->dbl_extra << 16));
             break;
     }
 }
 
-// ── Main processing (called from process_record_user) ────────────────────
+// ── Main processing ─────────────────────────────────────────────────────
 
 static bool process_tap_override(uint16_t keycode, keyrecord_t *record) {
-    for (int i = 0; i < ARRAY_SIZE(tap_overrides); i++) {
-        if (keycode == pgm_read_word(&tap_overrides[i].base_kc)) {
+    for (int i = 0; i < eeprom_tap_count; i++) {
+        if (keycode == eeprom_tap[i].base_kc) {
             if (record->event.pressed) {
                 uint16_t now = timer_read();
 
-                // Double tap?
                 if (tap_pending_idx == i && timer_elapsed(tap_timer) <= TAP_TERM) {
                     tap_pending_idx = -1;
-                    tap_fire_override(&tap_overrides[i]);
+                    tap_fire_override(&eeprom_tap[i]);
                     return false;
                 }
 
-                // Different key or timeout — fire pending single if any
                 if (tap_pending_idx >= 0) {
-                    uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
-                    tap_code16(base);
+                    tap_code16(eeprom_tap[tap_pending_idx].tap_kc);
                     tap_pending_idx = -1;
                 }
 
-                // Start new pending tap
                 tap_pending_idx = i;
                 tap_timer       = now;
-                return false;  // consume press
+                return false;
             } else {
-                // Release: consume if still this key's pending release
-                if (tap_pending_idx == i) {
-                    return false;  // timer will fire the tap
-                }
+                if (tap_pending_idx == i) return false;
                 return true;
             }
         }
     }
-    // Not an overridden key — fire any pending tap then let it through
     if (tap_pending_idx >= 0) {
-        uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
-        tap_code16(base);
+        tap_code16(eeprom_tap[tap_pending_idx].tap_kc);
         tap_pending_idx = -1;
     }
-    return true;  // let QMK process normally
+    return true;
 }
 
-// ── Periodic task (called from matrix_scan_user) ─────────────────────────
+// ── Periodic task ────────────────────────────────────────────────────────
 
 static void tap_override_task(void) {
     if (tap_pending_idx >= 0 && timer_elapsed(tap_timer) > TAP_TERM) {
         int8_t idx = tap_pending_idx;
         tap_pending_idx = -1;
-        uint16_t kc = pgm_read_word(&tap_overrides[idx].tap_kc);
-        tap_code16(kc);
+        tap_code16(eeprom_tap[idx].tap_kc);
     }
 }
 
@@ -433,7 +366,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // ── Normal processing ───────────────────────────────────────────────
     // If a tap is pending and a different key is pressed, fire the pending tap
     if (feature_tap_dance() && tap_pending_idx >= 0) {
-        uint16_t base = pgm_read_word(&tap_overrides[tap_pending_idx].tap_kc);
+        uint16_t base = eeprom_tap[tap_pending_idx].tap_kc;
         tap_code16(base);
         tap_pending_idx = -1;
     }
@@ -450,6 +383,87 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 #endif
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HID config handler — used by qmk_config_tool.py for export/import
+// ═════════════════════════════════════════════════════════════════════════════
+// data[0]=cmd(0x07=set/0x08=get/0x09=save), data[1]=channel(0x00),
+// data[2]=value_id, data[3]=index/count, data[4+]=payload
+
+void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+    uint8_t cmd = data[0];
+    uint8_t vid = data[2];
+    uint8_t idx = data[3];
+    uint8_t *pay = data + 4;
+    uint8_t  pay_len = length - 4;
+
+    if (data[1] != 0x00) return;  // not our channel
+
+    if (cmd == 0x08) {  // get
+        switch (vid) {
+            case 0x01:  // feature flags
+                data[3] = g_feature_flags;
+                break;
+            case 0x02:  // tap override count
+                data[3] = eeprom_tap_count;
+                break;
+            case 0x03:  // tap override entry by index
+                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t)) {
+                    memcpy(pay, &eeprom_tap[idx], sizeof(eeprom_tap_t));
+                }
+                break;
+            case 0x04:  // combo count
+                data[3] = eeprom_combo_count;
+                break;
+            case 0x05:  // combo entry by index
+                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t)) {
+                    memcpy(pay, &eeprom_combos[idx], sizeof(eeprom_combo_t));
+                }
+                break;
+            case 0x06:  // leader count
+                data[3] = eeprom_leader_count;
+                break;
+            case 0x07:  // leader entry by index
+                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t)) {
+                    memcpy(pay, &eeprom_leaders[idx], sizeof(eeprom_leader_t));
+                }
+                break;
+        }
+    } else if (cmd == 0x07) {  // set
+        switch (vid) {
+            case 0x01:
+                g_feature_flags = idx;
+                features_save();
+                break;
+            case 0x02:
+                eeprom_tap_count = (idx < MAX_TAP_OVERRIDES) ? idx : MAX_TAP_OVERRIDES;
+                break;
+            case 0x03:
+                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t)) {
+                    memcpy(&eeprom_tap[idx], pay, sizeof(eeprom_tap_t));
+                }
+                break;
+            case 0x04:
+                eeprom_combo_count = (idx < MAX_COMBOS) ? idx : MAX_COMBOS;
+                break;
+            case 0x05:
+                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t)) {
+                    memcpy(&eeprom_combos[idx], pay, sizeof(eeprom_combo_t));
+                }
+                break;
+            case 0x06:
+                eeprom_leader_count = (idx < MAX_LEADERS) ? idx : MAX_LEADERS;
+                break;
+            case 0x07:
+                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t)) {
+                    memcpy(&eeprom_leaders[idx], pay, sizeof(eeprom_leader_t));
+                }
+                break;
+        }
+    } else if (cmd == 0x09) {  // save
+        features_save_config();
+    }
+}
 
 void keyboard_post_init_user(void) {
     features_init();
