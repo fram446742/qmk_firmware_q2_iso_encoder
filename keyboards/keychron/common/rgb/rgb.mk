@@ -7,6 +7,7 @@ SRC += \
      $(RGB_MATRIX_DIR)/keychron_rgb.c \
      $(RGB_MATRIX_DIR)/per_key_rgb.c \
      $(RGB_MATRIX_DIR)/mixed_rgb.c \
-     $(RGB_MATRIX_DIR)/retail_demo.c
+     $(RGB_MATRIX_DIR)/retail_demo.c \
+     $(RGB_MATRIX_DIR)/rgb_matrix_extensions.c
 
 VPATH += $(RGB_MATRIX_DIR)

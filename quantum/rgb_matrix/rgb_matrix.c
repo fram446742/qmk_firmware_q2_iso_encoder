@@ -40,6 +40,7 @@ __attribute__((weak)) rgb_t rgb_matrix_hsv_to_rgb(hsv_t hsv) {
 
 // Generic effect runners
 #if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+#    include "../../keyboards/keychron/common/rgb/rgb_matrix_extensions.h"
 #    include "../../keyboards/keychron/common/rgb/animations/rgb_matrix_runners.inc"
 #else
 #    include "rgb_matrix_runners.inc"
@@ -102,7 +103,9 @@ static uint8_t         rgb_last_enable    = UINT8_MAX;
 static uint8_t         rgb_last_effect    = UINT8_MAX;
 static uint8_t         rgb_current_effect = 0;
 static effect_params_t rgb_effect_params  = {0, LED_FLAG_ALL, false, 0};
-uint8_t                rgb_regions[RGB_MATRIX_LED_COUNT];
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
+extern uint8_t         rgb_regions[RGB_MATRIX_LED_COUNT];
+#endif
 static rgb_task_states rgb_task_state     = SYNCING;
 
 // double buffers
@@ -213,18 +216,6 @@ void rgb_matrix_set_color_all(uint8_t red, uint8_t green, uint8_t blue) {
 #endif
 }
 
-void rgb_matrix_region_set_color(uint8_t region, int index, uint8_t red, uint8_t green, uint8_t blue) {
-    if (rgb_regions[index] == region) {
-        rgb_matrix_driver.set_color(index, red, green, blue);
-    }
-}
-
-void rgb_matrix_region_set_color_all(uint8_t region, uint8_t red, uint8_t green, uint8_t blue) {
-    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
-        if (rgb_regions[i] == region)
-            rgb_matrix_set_color(i, red, green, blue);
-}
-
 __attribute__((weak)) void rgb_matrix_none_indicators_kb(void) {}
 
 __attribute__((weak)) void rgb_matrix_none_indicators_user(void) {}
@@ -314,6 +305,7 @@ static bool rgb_matrix_none(effect_params_t *params) {
     }
 
     rgb_matrix_set_color_all(0, 0, 0);
+    rgb_matrix_none_indicators();
     return false;
 }
 
@@ -637,7 +629,9 @@ void rgb_matrix_mode_eeprom_helper(uint8_t mode, bool write_to_eeprom) {
      * LED.  Without this, leftover rgb_regions[] entries from MIX_RGB
      * leave those LEDs stuck in their last mix-RGB colour (the "stuck
      * zone" bug). */
+#if defined(KEYCHRON_RGB_ENABLE) && defined(EECONFIG_SIZE_CUSTOM_RGB)
     memset(rgb_regions, 0, sizeof(rgb_regions));
+#endif
     rgb_task_state = STARTING;
     eeconfig_flag_rgb_matrix(write_to_eeprom);
 #ifdef RGB_MATRIX_MODE_NAME_ENABLE
