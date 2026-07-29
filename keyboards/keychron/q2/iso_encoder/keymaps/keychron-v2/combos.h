@@ -4,29 +4,34 @@
 
 #include "quantum_keycodes.h"
 
-// ── Custom keycodes for combo-triggered features ────────────────────────────
-// These are handled in process_record_user() in keymap.c.
-// QK_KB_0 is the first custom keycode slot (SAFE_RANGE equivalent).
+// ═════════════════════════════════════════════════════════════════════════════
+// Custom keycodes for combo-triggered features
+// ═════════════════════════════════════════════════════════════════════════════
+// QK_KB_0 through NEW_SAFE_RANGE-1 are used by Keychron's custom_keycodes.
+// Our codes start at NEW_SAFE_RANGE (defined in q2/keycodes_custom.h).
 
-// keycodes_custom.h uses QK_KB_2 → NEW_SAFE_RANGE (0x5F0C).
-// Our feature keycodes start at NEW_SAFE_RANGE to avoid collisions.
 enum feature_keycodes {
     KC_AUTOSHIFT_TOGGLE = NEW_SAFE_RANGE,
+    KC_NKRO_TOGGLE,
     KC_FEAT_OVERVIEW,
 };
 
-// ── Combo event enum ────────────────────────────────────────────────────────
-// The actual key_combos[] array is defined in combos.c (included from keymap.c).
+// ═════════════════════════════════════════════════════════════════════════════
+// Combo definitions
+// ═════════════════════════════════════════════════════════════════════════════
+// key_combos[] is defined in combos.c (included from keymap.c).
+//
+// Navigational combos (A+S=ESC, J+K=BSPC, K+L=DEL) are in the source but
+// commented out — the base layer already has these keys.  Uncomment in
+// combos.c if you want simultaneous-press shortcuts.
 
 enum combo_events {
-    // Navigation shortcuts
-    CB_ESC,            // A + S  → Escape  (left home row)
-    CB_BSPC,           // J + K  → Backspace  (right home row)
-    CB_DEL,            // K + L  → Delete  (right home row)
+    // (navigational combos commented out — see combos.c)
 
-    // Feature toggles
+    // Toggles — fires custom keycode, handled in process_record_user()
     CB_TOG_AUTOSHIFT,  // Z + X  → toggle auto-shift
+    CB_TOG_NKRO,       // Space + Right Shift → toggle NKRO
 
-    // Feature overview
+    // Display
     CB_FEAT_OVERVIEW,  // O + P  → show feature status overview
 };

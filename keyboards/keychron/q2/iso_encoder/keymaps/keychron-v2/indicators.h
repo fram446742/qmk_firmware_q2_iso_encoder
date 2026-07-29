@@ -5,9 +5,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// ── LED index → physical key map (Q2 ISO encoder) ──────────────────────────
-// These map the per-key RGB LED index to the physical keycap.
-// The indices correspond to the order in iso_encoder.c's g_snled27351_leds[].
+// ═════════════════════════════════════════════════════════════════════════════
+// LED index → physical key map (Q2 ISO encoder)
+// ═════════════════════════════════════════════════════════════════════════════
+// Indices follow the order in iso_encoder.c's g_snled27351_leds[].
+// The encoder (Mute) at position k0O has no RGB LED → 67 LEDs for 68 keys.
 //
 //  Index  Key              Notes
 //  ─────  ──────────────── ──────────────────────────────
@@ -54,7 +56,7 @@
 //  47     C
 //  48     V
 //  49     B
-//  50     N
+//  50     N                ← NKRO indicator
 //  51     M
 //  52     ,
 //  53     .
@@ -73,16 +75,19 @@
 //  66     Right
 
 // ── Feature indicator LED indices ───────────────────────────────────────────
-// These LEDs show feature status during overview mode only.
-// During normal operation only the Caps Lock LED (index 28) is active.
+// During normal operation these LEDs are OFF (only Caps Lock at index 28
+// lights).  They illuminate only during feature overview (O+P combo)
+// to show which features are active.
 
-#define IND_AUTO_SHIFT         29   // A key — green when auto-shift on
+#define IND_CAPS_LOCK   28   // Caps Lock key — white when on
+#define IND_AUTO_SHIFT  29   // A key — green when auto-shift on
+#define IND_NKRO        50   // N key — white when NKRO on
 
 // ── API ─────────────────────────────────────────────────────────────────────
+// Trigger the feature overview — blacks out LEDs, lights indicators white
+// for active features, dim gray for inactive. Auto-cancels after 2 seconds
+// or on any keypress.
 
-// Start feature overview: saves current RGB mode, blacks out all LEDs,
-// lights feature indicators white (active) or dim (inactive).
-// Automatically cancels after OVERVIEW_TIMEOUT_MS or on next keypress.
 void feature_overview_trigger(void);
 bool feature_overview_is_active(void);
 void feature_overview_cancel(void);
