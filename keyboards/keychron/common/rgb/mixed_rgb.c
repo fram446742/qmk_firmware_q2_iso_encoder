@@ -69,8 +69,13 @@ bool mixed_rgb(effect_params_t *params) {
     bool ret;
 
     extern uint8_t rgb_regions[RGB_MATRIX_LED_COUNT];
+    /* Always mirror regions into rgb_regions on entry — the core clears
+     * rgb_regions[] when switching to a standard effect so they don't
+     * filter LEDs and leave zone-1 pixels stuck.  If we only did this
+     * on params->init, the first render after switching back to MIX_RGB
+     * would have an empty rgb_regions[] and zone 1 would paint nothing. */
+    memcpy(rgb_regions, regions, RGB_MATRIX_LED_COUNT);
     if (params->init) {
-        memcpy(rgb_regions, regions, RGB_MATRIX_LED_COUNT);
         memset(layer_effect_index, 0, sizeof(layer_effect_index));
 
         mixed_rgb_reset();

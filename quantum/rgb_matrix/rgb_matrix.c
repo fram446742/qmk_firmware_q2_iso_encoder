@@ -632,6 +632,12 @@ void rgb_matrix_mode_eeprom_helper(uint8_t mode, bool write_to_eeprom) {
     } else {
         rgb_matrix_config.mode = mode;
     }
+    /* Clear mix-RGB region assignments when switching to a standard
+     * effect, so rgb_matrix_region_set_color(0, i, ...) matches every
+     * LED.  Without this, leftover rgb_regions[] entries from MIX_RGB
+     * leave those LEDs stuck in their last mix-RGB colour (the "stuck
+     * zone" bug). */
+    memset(rgb_regions, 0, sizeof(rgb_regions));
     rgb_task_state = STARTING;
     eeconfig_flag_rgb_matrix(write_to_eeprom);
 #ifdef RGB_MATRIX_MODE_NAME_ENABLE

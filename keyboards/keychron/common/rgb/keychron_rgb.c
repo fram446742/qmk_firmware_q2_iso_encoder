@@ -141,9 +141,12 @@ void eeconfig_init_custom_rgb(void) {
         }
     }
     eeprom_read_block(effect_list, OFFSET_EFFECT_LIST, sizeof(effect_list));
-    /* Mirror regions into rgb_regions so the per-key RGB effect has
-     * valid region data even before the Vial/Launcher app pushes HID. */
-    memcpy(rgb_regions, regions, sizeof(rgb_regions));
+    /* rgb_regions[] is NOT mirrored from regions[] here — it stays at
+     * BSS zeros so every effect that goes through
+     * rgb_matrix_region_set_color(0, i, …) matches all LEDs.
+     * The explicit memset ensures this even if some other code path
+     * wrote to rgb_regions[] before keyboard_post_init completed. */
+    memset(rgb_regions, 0, sizeof(rgb_regions));
     update_mixed_rgb_effect_count();
 }
 
