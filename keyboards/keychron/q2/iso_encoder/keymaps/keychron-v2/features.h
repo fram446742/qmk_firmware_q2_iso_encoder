@@ -43,3 +43,49 @@ static inline bool    feature_dyn_macro(void)           { return feature_has(FEA
 static inline void    feature_toggle_dyn_macro(void)    { feature_toggle(FEATURE_DYN_MACRO); }
 static inline bool    feature_leader(void)              { return feature_has(FEATURE_LEADER); }
 static inline void    feature_toggle_leader(void)       { feature_toggle(FEATURE_LEADER); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EEPROM-backed config (tap overrides, combos, leader sequences)
+// ═════════════════════════════════════════════════════════════════════════════
+// Layout: 8100 flags(1B), 8101 count(1B), 8102+ entries, see features.c
+
+typedef enum {
+    TD_DBL_KEYCODE     = 0,
+    TD_DBL_UNICODE_STR = 1,
+    TD_DBL_UNICODE_CP  = 2,
+} td_dbl_type_t;
+
+typedef struct __attribute__((packed)) {
+    uint16_t base_kc;
+    uint16_t tap_kc;
+    uint8_t  dbl_type;
+    uint8_t  pad;
+    uint16_t dbl_val;
+    uint16_t dbl_extra;
+} eeprom_tap_t;
+#define MAX_TAP_OVERRIDES 20
+
+typedef struct __attribute__((packed)) {
+    uint16_t keys[4];
+    uint16_t output;
+} eeprom_combo_t;
+#define MAX_COMBOS 8
+
+typedef struct __attribute__((packed)) {
+    uint8_t  seq[3];
+    uint8_t  mod;
+    uint16_t key;
+} eeprom_leader_t;
+#define MAX_LEADERS 16
+
+// Runtime arrays (loaded from EEPROM at boot, writable via HID)
+extern eeprom_tap_t    eeprom_tap[MAX_TAP_OVERRIDES];
+extern uint8_t         eeprom_tap_count;
+extern eeprom_combo_t  eeprom_combos[MAX_COMBOS];
+extern uint8_t         eeprom_combo_count;
+extern eeprom_leader_t eeprom_leaders[MAX_LEADERS];
+extern uint8_t         eeprom_leader_count;
+
+void features_load_config(void);    // boot: EEPROM → RAM
+void features_save_config(void);    // HID save: RAM → EEPROM
+void features_load_defaults(void);  // first boot: defaults → RAM
