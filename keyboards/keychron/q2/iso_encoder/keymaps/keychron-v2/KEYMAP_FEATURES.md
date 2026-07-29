@@ -4,17 +4,14 @@
 
 | What | How |
 |---|---|
-| **Toggle Auto-Shift** | `Z + X` |
-| **Toggle Tap Dance** | `← + →` (Left + Right arrows) |
-| **Toggle Caps Word** | `C + V` |
-| **Toggle Repeat Key** | `R + T` |
-| **Toggle Dyn. Macro** | `D + F` |
-| **Toggle Leader Key** | `L + ;` |
-| **Toggle NKRO** | `Space + Right Shift` |
-| **Feature overview** | `O + P` — shows status LEDs for 2s |
+| **Feature overview** | `O + P` — enter overview mode (10s timeout) |
+| **Toggle features** | Inside overview: tap indicator key (A=AutoShift, T=TapDance, etc.) |
+| **Toggle layers** | Inside overview: tap number key (0-9) = `TG(N)` |
+| **Exit overview** | Tap any non-indicator key or wait 10s |
 | **Leader sequences** | `FN2 + Q` then one key (e.g. `W` = close tab) |
 | **Configure layers** | VIA app — layers 0-8 |
 | **Mac/Win base** | FN1 key adapts per base layer |
+| **Auto-correct** | `S` key in overview to toggle; built-in 66-entry dictionary |
 
 ---
 
@@ -32,71 +29,67 @@
 | 7 | `_FN5` | Blank — configure in VIA |
 | 8 | `_FN6` | Blank — configure in VIA |
 
-**FN key behaviour:** `FN1` (right of Space, index 62) activates `MAC_FN1` when `MAC_BASE` is active, or `WIN_FN1` when `WIN_BASE` is active. `FN2` (next to FN1, index 63) activates `_FN2`.
+The layer indicator in overview mode uses `layer_state` (not `default_layer_state`).
+This means `TG(N)` toggles in overview immediately light the matching number key.
+
+**FN key behaviour:** `FN1` (right of Space, index 62) activates `MAC_FN1` when `MAC_BASE` is active, or `WIN_FN1` when `WIN_FN1` is active. `FN2` (next to FN1, index 63) activates `_FN2`.
 
 ---
 
-## Tap Dance (custom callbacks)
+## Tap Dance (transparent override)
 
-Tap dance lets one key do different things based on single tap vs double tap.
-Instead of QMK's built-in `ACTION_TAP_DANCE_DOUBLE`, this keymap uses a
-custom `CUSTOM_TD_DOUBLE` macro with its own `td_double_finished` callback.
-This ensures any keycode (including `CW_TOGG`, `UC()`, etc.) works reliably.
+Tap dance behavior is provided by a **custom override system** that intercepts
+base-layer keycodes before QMK processes them. No `TD()` codes are needed in
+the keymap — all keycodes stay plain (e.g. `KC_BSPC`, `KC_ESC`, `KC_E`).
 
-### Defined tap dances
+The override table is in `keymap.c` under the `tap_overrides[]` array.
 
-| Index | Keycode | Name | Single tap | Double tap |
+### Current overrides
+
+| TD idx | Base key | Single tap | Double tap | Type |
 |---|---|---|---|---|
-| 0 | `0x5700` | `TD_BSPC_DEL` | Backspace | Delete |
-| 1 | `0x5701` | `TD_ESC_CAPS` | Escape | Caps Word toggle |
-| 2 | `0x5702` | `TD_E_EURO` | `e` | `€` (U+20AC) |
+| 0x5700 | `KC_BSPC` | Backspace | Delete | keycode |
+| 0x5701 | `KC_ESC` | Escape | Caps Word toggle | keycode |
+| 0x5702 | `KC_E` | `e` | `€` | Unicode string |
+| 0x5703 | `KC_2` | `2` | `@` | Unicode string |
+| 0x5704 | `KC_3` | `3` | `#` | Unicode string |
+| 0x5705 | `KC_5` | `5` | `½` | Unicode string |
+| 0x5706 | `KC_6` | `6` | `¬` | Unicode string |
+| 0x5707 | `` ` `` | `` ` `` | `~` | Unicode string |
+| 0x5708 | `KC_BSLS` | `\` | `|` | Unicode string |
+| 0x5709 | `[` | `[` | `{` | Unicode string |
+| 0x570A | `]` | `]` | `}` | Unicode string |
+| 0x570B | `KC_NUBS` | `\`(ISO) | `\` | Unicode string |
 
-The first two replace the base layer's `KC_BSPC` and `KC_ESC`. The third
-replaces `KC_E` on both Mac and Win base layers — single tap types `e`,
-double tap inputs the Euro sign.
+### How it works
 
-Plain `KC_BSPC` and `KC_ESC` are available on layer `_FN3`.
+Instead of QMK's TAP_DANCE_ENABLE (which is disabled), a custom timer-based
+state machine in `process_record_user()` intercepts the base keycodes:
+1. First tap: starts a 200ms timer, consumes the keypress
+2. Second tap within timeout: fires the double-tap action, resets
+3. Timeout expires: fires the single-tap action
+4. Different key pressed while pending: fires the single-tap immediately
 
-### Adding a new tap dance
+### Adding/changing overrides
 
-Open `keymap.c` and find the `TAP_DANCE_ENABLE` section:
+Edit the `tap_overrides[]` array in `keymap.c`. Each entry has a type:
+- `TD_DBL_KEYCODE` — double-tap sends a QMK keycode (e.g. `KC_DEL`)
+- `TD_DBL_UNICODE_STR` — double-tap sends a Unicode string (e.g. `"€"`)
+- `TD_DBL_UNICODE_CP` — double-tap sends a raw codepoint (e.g. `0x20AC`)
 
-```c
-enum {
-    TD_BSPC_DEL,
-    TD_ESC_CAPS,
-    TD_E_EURO,
-    // add yours here (no trailing comma needed before ])
-};
-
-tap_dance_action_t tap_dance_actions[] = {
-    [TD_BSPC_DEL] = CUSTOM_TD_DOUBLE(KC_BSPC,   KC_DEL),
-    [TD_ESC_CAPS] = CUSTOM_TD_DOUBLE(KC_ESC,    CW_TOGG),
-    [TD_E_EURO]   = CUSTOM_TD_DOUBLE(KC_E,     UC(0x20AC)),
-    // add yours here
-};
-```
-
-Then place `TD(YOUR_ENUM)` at any position in the keymaps.
-
-### Tapping term delay
-
-The single-tap has a ~200ms delay (the `TAPPING_TERM`) because the firmware waits to see if you'll tap again. To reduce it:
-
-```c
-// In config.h — lower from default 200ms
-#define TAPPING_TERM 150
-```
-
-Too low and double-taps may be registered as two single taps.
+A compile-time duplicate-check enum prevents adding two overrides for the
+same base key.
 
 ### Disabling tap dance at runtime
 
-Press `← + →` (Left + Right arrows) simultaneously to toggle tap dance on/off. When off, the TD keycodes act as plain Backspace and Escape. The feature flag persists in EEPROM across power cycles.
+Press **T** in the overview (`O + P`) to toggle. When OFF, all tapped keys
+behave as their base keycode (no double-tap). The feature flag persists in
+EEPROM.
 
-Use the feature overview (`O + P`) to check current state:
-- T key cyan = tap dance ON
-- T key dim = tap dance OFF
+### Tapping term
+
+The 200ms window (`TAP_TERM` in keymap.c) can be adjusted. Lower values
+feel more responsive but make double-taps harder to trigger.
 
 ---
 
@@ -104,18 +97,17 @@ Use the feature overview (`O + P`) to check current state:
 
 Combos fire when two keys are pressed **simultaneously** within the same 50ms window.
 
-### Active combos
+### Active combo
 
 | Combo | Keys | Action |
 |---|---|---|
-| `CB_TOG_AUTOSHIFT` | `Z + X` | Toggle Auto-Shift on/off |
-| `CB_TOG_TAP_DANCE` | `← + →` | Toggle Tap Dance on/off |
-| `CB_TOG_NKRO` | `Space + Right Shift` | Toggle NKRO on/off |
-| `CB_FEAT_OVERVIEW` | `O + P` | Show feature status overview |
+| `CB_FEAT_OVERVIEW` | `O + P` | Enter feature overview mode |
 
 ### Commented-out combos (in combos.c)
 
-Navigation combos `A+S=ESC`, `J+K=BSPC`, `K+L=DEL` are in the source but commented. They're redundant with the base layer keys and consume flash. Uncomment the PROGMEM arrays and the table entries in `combos.c` to restore them.
+All feature-toggle combos (`Z+X` for AutoShift, `←+→` for Tap Dance, etc.) and
+navigation combos (`A+S=ESC`, `J+K=BSPC`, `K+L=DEL`) are commented out. Toggles
+are now done inside the overview mode (see below). Source preserved for reference.
 
 ---
 
@@ -170,23 +162,45 @@ The Leader key (`QK_LEAD`) is at `_FN2` position row 1 col 0 (was `UG_TOGG` in t
 
 ---
 
-## Feature Overview
+## Feature Overview (interactive mode)
 
-Press `O + P` to see which features are active:
+Press `O + P` to enter overview mode. All LEDs go dark, then indicator keys
+light up: **white** = feature ON, **red** = feature OFF. Number keys show the
+active layer.
 
-| LED | Key | Color when ON | Color when OFF | Meaning |
+While in overview mode (10s timeout, **resets on each keypress**), the keyboard
+becomes a control panel using **physical key positions** (not keycodes):
+
+| Press | Action |
+|---|---|
+| **A** | Toggle Auto-Shift |
+| **S** | Toggle Auto-Correct |
+| **T** | Toggle Tap Dance |
+| **C** | Toggle Caps Word processing |
+| **R** | Toggle Repeat Key processing |
+| **D** | Toggle Dynamic Macro processing |
+| **L** | Toggle Leader Key processing |
+| **N** | Toggle NKRO |
+| **0-9** | `TG(N)` — toggle layer N on/off |
+| **any other key** | Exit overview |
+
+Since matching is by physical position (matrix row/col), number keys work even
+on function layers that don't have a number row in their keymap.
+
+### Indicator LED map
+
+| LED | Key | ON color | OFF color | Means |
 |---|---|---|---|---|
-| 10/1-8 | Number row | White | Off/red | Active layer number |
+| 10/1-8 | Number row | White | Red | Active layer (highest in layer_state) |
 | 28 | Caps Lock | White | Red | Caps Lock hardware state |
-| 19 | T | White | Red | Tap Dance ON |
+| 19 | T | White | Red | Tap Dance processing ON |
 | 29 | A | White | Red | Auto-Shift ON |
+| 30 | **S** | White | Red | Auto-Correct ON |
 | 47 | C | White | Red | Caps Word processing ON |
 | 18 | R | White | Red | Repeat Key ON |
 | 31 | D | White | Red | Dynamic Macro ON |
 | 37 | L | White | Red | Leader Key ON |
 | 50 | N | White | Red | NKRO ON |
-
-All other LEDs go dark. The display lasts 2 seconds or until the next keypress, then restores the normal RGB effect.
 
 ---
 
@@ -201,28 +215,50 @@ To activate:
 
 ---
 
-## Caps Word
+## Auto-Correct
 
-Caps Word acts like Caps Lock but **auto-disables after a non-alpha key**
-(space, enter, punctuation, etc.). Great for typing `SOME_VAR` or `CONSTANT`
-without accidentally leaving caps on.
+Auto-correct detects common typos and replaces them as you type. The dictionary
+is a 66-entry trie compiled into flash (not editable at runtime).
 
 | Method | How |
 |---|---|
-| Toggle on/off | `C + V` combo or assign `KC_CAPS_WORD_TOGGLE` in VIA |
+| Toggle on/off | Press **S** in overview |
+| State | EEPROM-backed via `keymap_config.autocorrect_enable` |
+| Add corrections | Edit `typos.txt`, run `qmk generate-autocorrect-data`, reflash |
+
+The S key in the feature overview shows white when ON, red when OFF.
+
+### Customizing the dictionary
+
+Edit `typos.txt` in the keymap directory, then:
+```sh
+qmk generate-autocorrect-data keyboards/keychron/q2/iso_encoder/keymaps/keychron-v2/typos.txt -o keyboards/keychron/q2/iso_encoder/keymaps/keychron-v2/autocorrect_data.h
+make keychron/q2/iso_encoder:keychron-v2:flash
+```
+
+Format: `:typo -> correction` (one per line, colon marks word boundary).
+
+## Caps Word
+
+Caps Word acts like Caps Lock but **auto-disables after a non-alpha key**
+(space, enter, punctuation, etc.).
+
+| Method | How |
+|---|---|
+| Toggle processing | Press **C** in overview |
 | Activate caps word | `CW_TOGG` keycode (or double-tap Esc via tap dance) |
 
-When Caps Word processing is OFF, the `CW_TOGG` keycode does nothing.
+When Caps Word processing is OFF, `CW_TOGG` does nothing.
 The C key in the feature overview shows white when ON, red when OFF.
 
 ## Repeat Key
 
-After tapping any key, `QK_REP` repeats that key. `QK_ALT_REP` repeats with a
+After tapping any key, `QK_REP` repeats it. `QK_ALT_REP` repeats with a
 modified behaviour (e.g. after left-arrow, Alt-Repeat sends right-arrow).
 
 | Method | How |
 |---|---|
-| Toggle on/off | `R + T` combo or assign `KC_REPEAT_KEY_TOGGLE` in VIA |
+| Toggle processing | Press **R** in overview |
 | Repeat last key | Assign `QK_REP` in VIA |
 | Alt-repeat | Assign `QK_ALT_REP` in VIA |
 
@@ -234,13 +270,13 @@ Record and playback keystrokes on the fly — no software needed.
 
 | Method | How |
 |---|---|
-| Toggle on/off | `D + F` combo or assign `KC_DYN_MACRO_TOGGLE` in VIA |
+| Toggle processing | Press **D** in overview |
 | Record/play slot 1 | Assign `QK_DYNAMIC_MACRO_1` in VIA |
 | Record/play slot 2 | Assign `QK_DYNAMIC_MACRO_2` in VIA |
 
-**Usage:** press `QK_DYNAMIC_MACRO_1` → LEDs flash → type your macro →
-press the same key again → recording stops. Press it again to play back.
-The D key in the feature overview shows white when ON, red when OFF.
+Press `QK_DYNAMIC_MACRO_1` → LEDs flash → type your macro →
+press again → stops. Press to play back.
+The D key shows white when ON, red when OFF in overview.
 
 ## Layer Lock
 
@@ -284,7 +320,8 @@ With 8KB logical EEPROM:
 | 3 | Repeat Key | ON (1) |
 | 4 | Dynamic Macro | ON (1) |
 | 5 | Leader Key | ON (1) |
-| 6-7 | Reserved | OFF |
+| 6 | Auto-correct | ON (1) |
+| 7 | Reserved | OFF |
 
 First boot (EEPROM = 0xFF) writes `0x00` — all features OFF initially.
 Tap-dance / auto-shift / NKRO functions are still available but the

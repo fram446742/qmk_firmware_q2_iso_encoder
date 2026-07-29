@@ -125,6 +125,13 @@ void indicator_draw(void) {
         rgb_matrix_set_color(IND_LEADER, 255, 0, 0);
     }
 
+    // Auto-correct (from keymap_config)
+    if (keymap_config.autocorrect_enable) {
+        rgb_matrix_set_color(IND_AUTOCORRECT, 255, 255, 255);
+    } else {
+        rgb_matrix_set_color(IND_AUTOCORRECT, 255, 0, 0);
+    }
+
     // NKRO (from QMK core — not a feature flag)
     if (keymap_config.nkro) {
         rgb_matrix_set_color(IND_NKRO, 255, 255, 255);

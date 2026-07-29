@@ -89,6 +89,7 @@
 #define IND_REPEAT_KEY  18   // R          Repeat Key ON
 #define IND_DYN_MACRO   31   // D          Dynamic Macro ON
 #define IND_LEADER      37   // L          Leader Key ON
+#define IND_AUTOCORRECT 30   // S          Auto-correct ON
 #define IND_NKRO        50   // N          NKRO ON (from keymap_config)
 
 // ── Layer indicator (lit during O+P overview) ─────────────────────────────

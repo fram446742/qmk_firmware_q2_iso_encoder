@@ -21,6 +21,9 @@ COMBO_ENABLE = yes
 # Long-press auto-shift
 AUTO_SHIFT_ENABLE = yes
 
+# Auto-correct (typo correction via compile-time trie dictionary)
+AUTOCORRECT_ENABLE = yes
+
 # Leader key sequences
 LEADER_ENABLE = yes
 
