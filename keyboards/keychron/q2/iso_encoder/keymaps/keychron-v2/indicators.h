@@ -79,10 +79,22 @@
 // lights).  They illuminate only during feature overview (O+P combo)
 // to show which features are active.
 
-#define IND_CAPS_LOCK   28   // Caps Lock key — white when on
-#define IND_AUTO_SHIFT  29   // A key — green when auto-shift on
-#define IND_TAP_DANCE   19   // T key — cyan when tap-dance on
-#define IND_NKRO        50   // N key — white when NKRO on
+// ── Existing hardware indicator (always lit) ─────────────────────────────
+#define IND_CAPS_LOCK   28   // Caps Lock — white when caps active
+
+// ── Feature indicators (lit only during O+P overview) ─────────────────────
+#define IND_AUTO_SHIFT  29   // A          Auto-Shift ON
+#define IND_TAP_DANCE   19   // T          Tap Dance ON
+#define IND_CAPS_WORD   47   // C          Caps Word processing ON
+#define IND_REPEAT_KEY  18   // R          Repeat Key ON
+#define IND_DYN_MACRO   31   // D          Dynamic Macro ON
+#define IND_LEADER      37   // L          Leader Key ON
+#define IND_NKRO        50   // N          NKRO ON (from keymap_config)
+
+// ── Layer indicator (lit during O+P overview) ─────────────────────────────
+// The currently active layer lights the matching number key.
+// Layer 0 → key 0 (LED 10), Layer 1 → key 1 (LED 1), … Layer 8 → key 8 (LED 8)
+#define IND_LAYER_BASE  1    // offset: layer N → LED 1+N, layer 0 → LED 10
 
 // ── API ─────────────────────────────────────────────────────────────────────
 // Trigger the feature overview — blacks out LEDs, lights indicators white

@@ -13,6 +13,10 @@
 enum feature_keycodes {
     KC_AUTOSHIFT_TOGGLE = NEW_SAFE_RANGE,
     KC_TAP_DANCE_TOGGLE,
+    KC_CAPS_WORD_TOGGLE,
+    KC_REPEAT_KEY_TOGGLE,
+    KC_DYN_MACRO_TOGGLE,
+    KC_LEADER_TOGGLE,
     KC_NKRO_TOGGLE,
     KC_FEAT_OVERVIEW,
 };
@@ -30,10 +34,14 @@ enum combo_events {
     // (navigational combos commented out — see combos.c)
 
     // Toggles — fires custom keycode, handled in process_record_user()
-    CB_TOG_AUTOSHIFT,  // Z + X     → toggle auto-shift
-    CB_TOG_TAP_DANCE,  // LEFT + R.Arrow  → toggle tap-dance
-    CB_TOG_NKRO,       // Space + R.Shift → toggle NKRO
+    CB_TOG_AUTOSHIFT,  // Z + X        → toggle auto-shift
+    CB_TOG_TAP_DANCE,  // LEFT + RIGHT → toggle tap-dance
+    CB_TOG_CAPS_WORD,  // C + V        → toggle caps-word processing
+    CB_TOG_REPEAT_KEY, // R + T        → toggle repeat-key processing
+    CB_TOG_DYN_MACRO,  // D + F        → toggle dynamic-macro processing
+    CB_TOG_LEADER,     // L + ;        → toggle leader-key processing
+    CB_TOG_NKRO,       // SPC + RSFT   → toggle NKRO
 
     // Display
-    CB_FEAT_OVERVIEW,  // O + P     → show feature status overview
+    CB_FEAT_OVERVIEW,  // O + P        → show feature status overview
 };

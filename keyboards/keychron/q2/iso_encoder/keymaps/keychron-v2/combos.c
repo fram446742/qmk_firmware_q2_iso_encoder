@@ -24,6 +24,10 @@
 
 const uint16_t PROGMEM cb_tog_autoshift[]   = {KC_Z, KC_X, COMBO_END};           // Z+X:       AutoShift
 const uint16_t PROGMEM cb_tog_tap_dance[]   = {KC_LEFT, KC_RGHT, COMBO_END};    // LEFT+RGHT: Tap Dance
+const uint16_t PROGMEM cb_tog_caps_word[]   = {KC_C, KC_V, COMBO_END};           // C+V:       Caps Word
+const uint16_t PROGMEM cb_tog_repeat_key[]  = {KC_R, KC_T, COMBO_END};           // R+T:       Repeat Key
+const uint16_t PROGMEM cb_tog_dyn_macro[]   = {KC_D, KC_F, COMBO_END};           // D+F:       Dyn Macro
+const uint16_t PROGMEM cb_tog_leader[]      = {KC_L, KC_SCLN, COMBO_END};        // L+;:       Leader Key
 const uint16_t PROGMEM cb_tog_nkro[]        = {KC_SPC, KC_RSFT, COMBO_END};     // SPC+RSFT:  NKRO
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -45,6 +49,10 @@ combo_t key_combos[] = {
     // Feature toggles
     [CB_TOG_AUTOSHIFT]   = COMBO(cb_tog_autoshift,   KC_AUTOSHIFT_TOGGLE),
     [CB_TOG_TAP_DANCE]   = COMBO(cb_tog_tap_dance,   KC_TAP_DANCE_TOGGLE),
+    [CB_TOG_CAPS_WORD]   = COMBO(cb_tog_caps_word,   KC_CAPS_WORD_TOGGLE),
+    [CB_TOG_REPEAT_KEY]  = COMBO(cb_tog_repeat_key,  KC_REPEAT_KEY_TOGGLE),
+    [CB_TOG_DYN_MACRO]   = COMBO(cb_tog_dyn_macro,   KC_DYN_MACRO_TOGGLE),
+    [CB_TOG_LEADER]      = COMBO(cb_tog_leader,      KC_LEADER_TOGGLE),
     [CB_TOG_NKRO]        = COMBO(cb_tog_nkro,        KC_NKRO_TOGGLE),
 
     // Overview
