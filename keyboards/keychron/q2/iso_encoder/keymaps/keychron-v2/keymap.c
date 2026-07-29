@@ -310,6 +310,32 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // User callbacks — feature toggles, indicators, animation overview
 // =============================================================================
 
+// ── Tap dance runtime fence ────────────────────────────────────────────────
+// When tap dance is DISABLED (via feature flag), intercept TD keycodes before
+// process_tap_dance() sees them and convert to plain keys.
+// The fence runs in preprocess_record_user which fires BEFORE tap dance.
+
+#if defined(TAP_DANCE_ENABLE) && defined(COMBO_ENABLE)
+bool preprocess_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!feature_tap_dance()) {
+        switch (keycode) {
+            case TD(TD_BSPC_DEL):
+                if (record->event.pressed) {
+                    tap_code(KC_BSPC);
+                }
+                return false;  // block all further processing for this key
+
+            case TD(TD_ESC_CAPS):
+                if (record->event.pressed) {
+                    tap_code(KC_ESC);
+                }
+                return false;
+        }
+    }
+    return true;
+}
+#endif
+
 #if defined(COMBO_ENABLE) || defined(KEY_OVERRIDE_ENABLE)
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
@@ -317,6 +343,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 #ifdef COMBO_ENABLE
             case KC_AUTOSHIFT_TOGGLE:
                 feature_toggle_auto_shift();
+                return false;
+            case KC_TAP_DANCE_TOGGLE:
+                feature_toggle_tap_dance();
                 return false;
             case KC_NKRO_TOGGLE:
                 clear_keyboard();

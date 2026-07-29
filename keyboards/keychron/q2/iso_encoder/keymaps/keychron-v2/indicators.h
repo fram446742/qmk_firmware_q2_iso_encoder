@@ -81,6 +81,7 @@
 
 #define IND_CAPS_LOCK   28   // Caps Lock key — white when on
 #define IND_AUTO_SHIFT  29   // A key — green when auto-shift on
+#define IND_TAP_DANCE   19   // T key — cyan when tap-dance on
 #define IND_NKRO        50   // N key — white when NKRO on
 
 // ── API ─────────────────────────────────────────────────────────────────────

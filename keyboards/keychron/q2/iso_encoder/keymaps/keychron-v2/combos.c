@@ -22,8 +22,9 @@
 // Feature toggles
 // ═════════════════════════════════════════════════════════════════════════════
 
-const uint16_t PROGMEM cb_tog_autoshift[]   = {KC_Z, KC_X, COMBO_END};   // Z+X: AutoShift
-const uint16_t PROGMEM cb_tog_nkro[]        = {KC_SPC, KC_RSFT, COMBO_END};  // SPC+RSFT: NKRO
+const uint16_t PROGMEM cb_tog_autoshift[]   = {KC_Z, KC_X, COMBO_END};           // Z+X:       AutoShift
+const uint16_t PROGMEM cb_tog_tap_dance[]   = {KC_LEFT, KC_RGHT, COMBO_END};    // LEFT+RGHT: Tap Dance
+const uint16_t PROGMEM cb_tog_nkro[]        = {KC_SPC, KC_RSFT, COMBO_END};     // SPC+RSFT:  NKRO
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Display
@@ -43,6 +44,7 @@ combo_t key_combos[] = {
 
     // Feature toggles
     [CB_TOG_AUTOSHIFT]   = COMBO(cb_tog_autoshift,   KC_AUTOSHIFT_TOGGLE),
+    [CB_TOG_TAP_DANCE]   = COMBO(cb_tog_tap_dance,   KC_TAP_DANCE_TOGGLE),
     [CB_TOG_NKRO]        = COMBO(cb_tog_nkro,        KC_NKRO_TOGGLE),
 
     // Overview
