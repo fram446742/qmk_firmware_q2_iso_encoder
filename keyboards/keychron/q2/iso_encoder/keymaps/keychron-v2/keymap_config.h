@@ -237,7 +237,7 @@ enum combo_events {
 // COMBO DEFINITIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
-#define COMBO_FEAT_OVERVIEW_KEYS    {KC_O, KC_P, COMBO_END}
+#define COMBO_FEAT_OVERVIEW_KEYS    {POS_KC_O, POS_KC_LBRC, COMBO_END}
 #define COMBO_FEAT_OVERVIEW_ACTION   KC_FEAT_OVERVIEW
 
 
@@ -283,15 +283,15 @@ enum combo_events {
 //   37    L     Leader Key ON
 //   50    N     NKRO ON
 
-#define IND_CAPS_LOCK   28
-#define IND_AUTO_SHIFT  29
-#define IND_TAP_DANCE   19
-#define IND_CAPS_WORD   47
-#define IND_REPEAT_KEY  18
-#define IND_DYN_MACRO   31
-#define IND_LEADER      37
-#define IND_AUTOCORRECT 30
-#define IND_NKRO        50
+#define IND_CAPS_LOCK   POS_KC_CAPS
+#define IND_AUTO_SHIFT  POS_KC_A
+#define IND_TAP_DANCE   POS_KC_T
+#define IND_CAPS_WORD   POS_KC_C
+#define IND_REPEAT_KEY  POS_KC_R
+#define IND_DYN_MACRO   POS_KC_D
+#define IND_LEADER      POS_KC_L
+#define IND_AUTOCORRECT POS_KC_S
+#define IND_NKRO        POS_KC_N
 
 // Layer indicator: layer N → key N+1 (LED 1-9), layer 0 → key 0 (LED 10)
 #define IND_LAYER_BASE  1
