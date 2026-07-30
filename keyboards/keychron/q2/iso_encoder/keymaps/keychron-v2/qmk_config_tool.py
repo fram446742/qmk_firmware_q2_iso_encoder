@@ -10,9 +10,57 @@ Reads/writes the full keyboard configuration over USB Raw HID.
   python3 qmk_config_tool.py --mock export config.json
 """
 
-import json, struct, sys, argparse
+import json, struct, sys, os, argparse, re
 from dataclasses import dataclass, field
 from typing import Optional
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Shared constants — read from features.h to stay in sync with firmware
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _read_header(name: str) -> dict:
+    """Extract `#define NAME value` from a C header file.
+    Returns a dict of {name: int_value} for lines matching the pattern.
+    """
+    path = os.path.join(os.path.dirname(__file__), name)
+    result = {}
+    try:
+        with open(path) as f:
+            for line in f:
+                m = re.match(r'#define\s+(\w+)\s+(0x[0-9a-fA-F]+|\d+)', line)
+                if m:
+                    raw = m.group(2)
+                    result[m.group(1)] = int(raw, 16) if raw.startswith('0x') else int(raw)
+    except (FileNotFoundError, IOError):
+        pass  # caller falls back to hardcoded defaults
+    return result
+
+_consts = _read_header('features.h')
+
+# Protocol value IDs — from features.h, fallback to hardcoded
+VALUE_FLAGS         = _consts.get('VALUE_FLAGS', 0x01)
+VALUE_TAP_COUNT     = _consts.get('VALUE_TAP_COUNT', 0x02)
+VALUE_TAP_ENTRY     = _consts.get('VALUE_TAP_ENTRY', 0x03)
+VALUE_COMBO_COUNT   = _consts.get('VALUE_COMBO_COUNT', 0x04)
+VALUE_COMBO_ENTRY   = _consts.get('VALUE_COMBO_ENTRY', 0x05)
+VALUE_LEADER_COUNT  = _consts.get('VALUE_LEADER_COUNT', 0x06)
+VALUE_LEADER_ENTRY  = _consts.get('VALUE_LEADER_ENTRY', 0x07)
+
+# Feature bit positions — from features.h
+BIT_TAP_DANCE  = _consts.get('FEATURE_TAP_DANCE', 1).bit_length() - 1
+BIT_AUTO_SHIFT = _consts.get('FEATURE_AUTO_SHIFT', 2).bit_length() - 1
+BIT_CAPS_WORD  = _consts.get('FEATURE_CAPS_WORD', 4).bit_length() - 1
+BIT_REPEAT_KEY = _consts.get('FEATURE_REPEAT_KEY', 8).bit_length() - 1
+BIT_DYN_MACRO  = _consts.get('FEATURE_DYN_MACRO', 16).bit_length() - 1
+BIT_LEADER     = _consts.get('FEATURE_LEADER', 32).bit_length() - 1
+
+FEATURE_MAP = {
+    BIT_TAP_DANCE: 'tapDance', BIT_AUTO_SHIFT: 'autoShift',
+    BIT_CAPS_WORD: 'capsWord', BIT_REPEAT_KEY: 'repeatKey',
+    BIT_DYN_MACRO: 'dynMacro', BIT_LEADER: 'leader',
+    6: 'autocorrect',  # keymap_config.autocorrect_enable (not a bit flag)
+}
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HID Protocol (matches firmware via_custom_value_command_kb)
@@ -29,21 +77,11 @@ VIA_PROTOCOL_SET     = 0x07
 VIA_PROTOCOL_SAVE    = 0x09
 VIA_CHANNEL          = 0x00
 
-VALUE_FLAGS          = 0x01   # feature flags (1 byte)
-VALUE_TAP_COUNT      = 0x02   # tap override count (1 byte)
-VALUE_TAP_ENTRY      = 0x03   # tap override entry by index (10 bytes)
-VALUE_COMBO_COUNT    = 0x04   # combo count (1 byte)
-VALUE_COMBO_ENTRY    = 0x05   # combo entry by index (10 bytes)
-VALUE_LEADER_COUNT   = 0x06   # leader count (1 byte)
-VALUE_LEADER_ENTRY   = 0x07   # leader entry by index (6 bytes)
-
-# Feature bit positions
-FEATURE_MAP = {0: "tapDance", 1: "autoShift", 2: "capsWord",
-               3: "repeatKey", 4: "dynMacro", 5: "leader", 6: "autocorrect"}
-
-DBL_KEYCODE     = 0
-DBL_UNICODE_STR = 1
-DBL_UNICODE_CP  = 2
+# Tap dance action types (from td_dbl_type_t enum in features.h)
+DBL_KEYCODE      = 0
+DBL_UNICODE_STR  = 1
+DBL_UNICODE_CP   = 2
+DBL_SEND_STRING  = 3
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Keycode helpers
@@ -66,7 +104,7 @@ KC = {  # subset of common QMK keycodes
     0xE2:"KC_LALT",0xE6:"KC_RALT",0xE3:"KC_LGUI",0xE7:"KC_RGUI",
     0x36:"KC_BSLS",0x52:"KC_UP",0x50:"KC_LEFT",0x51:"KC_DOWN",
     0x4F:"KC_RGHT",0xB0:"KC_MUTE",
-    0x7C73:"CW_TOGG",0x5C01:"KC_FEAT_OVERVIEW",
+    0x7C73:"CW_TOGG",0x5F22:"KC_FEAT_OVERVIEW",
 }
 KC_NAMES = {v:k for k,v in KC.items()}
 
@@ -78,12 +116,29 @@ MOD_VALS = {v:k for k,v in MOD_NAMES.items()}
 
 def kc_name(v):
     if v == 0: return "KC_NO"
-    if v in MOD_NAMES: return MOD_NAMES[v]
+    # Keycode names take priority over mod names (both use same numeric space
+    # but keycodes are 16-bit HID usage codes, mods are 8-bit bitmask values).
     if v in KC: return KC[v]
+    if v in MOD_NAMES: return MOD_NAMES[v]
     if 0x5700 <= v <= 0x57FF: return f"TD({v-0x5700})"
     if 0x5F00 <= v <= 0x5FFF: return f"CUSTOM({v-0x5F00})"
     if v >= 0x8000: return f"UC(0x{v-0x8000:04X})"
+    # QMK modded keycode: e.g. 0x021F = LSFT(KC_2)
+    if v < 0x1F00:  # all modded codes are 0x0100-0x18FF
+        mod = v & 0x1F00
+        base = v & 0xFF
+        if mod and base in KC:
+            prefix = _MOD_PREFIXES.get(mod)
+            if prefix:
+                return f"{prefix}({KC[base]})"
     return f"0x{v:04X}"
+
+# QMK modifier wrapper mapping for kc_val parsing
+_MOD_WRAPPERS = {
+    'LCTL': 0x0100, 'LSFT': 0x0200, 'LALT': 0x0400, 'LGUI': 0x0800,
+    'RCTL': 0x1100, 'RSFT': 0x1200, 'RALT': 0x1400, 'RGUI': 0x1800,
+    'C': 0x0100, 'S': 0x0200, 'A': 0x0400, 'G': 0x0800,
+}
 
 def kc_val(s):
     if isinstance(s, int): return s
@@ -91,10 +146,17 @@ def kc_val(s):
     if s.startswith("TD("): return 0x5700+int(s[3:-1])
     if s.startswith("CUSTOM("): return 0x5F00+int(s[7:-1])
     if s.startswith("UC(0x"): return 0x8000+int(s[5:-1],16)
+    # QMK modifier wrapper: e.g. LSFT(KC_2), RALT(KC_E), S(KC_GRV)
+    m = re.match(r'^(' + '|'.join(_MOD_WRAPPERS) + r')\((.+)\)$', s)
+    if m:
+        return _MOD_WRAPPERS[m.group(1)] | kc_val(m.group(2))
     if s in KC_NAMES: return KC_NAMES[s]
     if s in MOD_VALS: return MOD_VALS[s]
     try: return int(s)
     except: return 0
+
+# Reverse mapping for kc_name
+_MOD_PREFIXES = {v: k for k, v in _MOD_WRAPPERS.items()}
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Data structures
@@ -141,20 +203,19 @@ class MockHIDDevice:
         self._init_defaults()
 
     def _init_defaults(self):
+        # Tap override defaults — must match features_load_defaults() in features.c.
+        # Combos and leaders have no EEPROM defaults (they're compile-time only,
+        # defined in combos.c and leader_end_user() in keymap.c).
+        # EEPROM combo/leader storage is for user customizations via this tool.
         self.tap = [
             pack_tap_entry("KC_BSPC","KC_BSPC",DBL_KEYCODE,kc_val("KC_DEL")),
             pack_tap_entry("KC_ESC","KC_ESC",DBL_KEYCODE,kc_val("CW_TOGG")),
-            pack_tap_entry("KC_E","KC_E",DBL_UNICODE_STR,0x20AC),
-            pack_tap_entry("KC_2","KC_2",DBL_UNICODE_STR,ord('@')),
-            pack_tap_entry("KC_GRV","KC_GRV",DBL_UNICODE_STR,ord('~')),
+            pack_tap_entry("KC_E","KC_E",DBL_KEYCODE,kc_val("RALT(KC_E)")),
+            pack_tap_entry("KC_2","KC_2",DBL_KEYCODE,kc_val("LSFT(KC_2)")),
+            pack_tap_entry("KC_4","KC_4",DBL_KEYCODE,kc_val("LSFT(KC_GRV)")),
         ]
-        self.combos = [
-            pack_combo(["KC_O","KC_P"],"CUSTOM(12)"),
-        ]
-        self.leaders = [
-            pack_leader(["KC_W"],"KC_LGUI","KC_W"),
-            pack_leader(["KC_Q"],"KC_LGUI","KC_Q"),
-        ]
+        self.combos = []
+        self.leaders = []
 
     def connect(self): pass
     def close(self): pass
@@ -261,11 +322,16 @@ def _save(dev):
 
 def tap_to_json(data):
     b,t,d,v,x = unpack_tap_entry(data)
-    if d == DBL_KEYCODE:  dt = "keycode"; dv = kc_name(v)
+    if d == DBL_KEYCODE:
+        dt = "keycode"; dv = kc_name(v)
     elif d == DBL_UNICODE_STR:
         dt = "unicode"
         dv = (v.to_bytes(2,'little')+x.to_bytes(2,'little')).rstrip(b'\x00').decode('utf-8',errors='replace')
-    else:  dt = "codepoint"; dv = f"U+{(v|x<<16):05X}"
+    elif d == DBL_SEND_STRING:
+        dt = "string"
+        dv = (v.to_bytes(2,'little')+x.to_bytes(2,'little')).rstrip(b'\x00').decode('ascii',errors='replace')
+    else:
+        dt = "codepoint"; dv = f"U+{(v|x<<16):05X}"
     return {"base": kc_name(b), "tap": kc_name(t), "double": {"type": dt, "value": dv}}
 
 
@@ -279,10 +345,15 @@ def json_to_tap(j) -> bytes:
         v = int.from_bytes(s[:2].ljust(2,b'\x00'),'little')
         x = int.from_bytes(s[2:].ljust(2,b'\x00'),'little') if len(s)>2 else 0
         return pack_tap_entry(j["base"],j["tap"],DBL_UNICODE_STR,v,x)
-    else:
+    elif d["type"] == "codepoint":
         cp_str = d["value"].replace("U+","")
         cp = int(cp_str,16)
         return pack_tap_entry(j["base"],j["tap"],DBL_UNICODE_CP,cp&0xFFFF,(cp>>16)&0xFFFF)
+    else:  # string
+        s = d["value"].encode('ascii')[:4]
+        v = int.from_bytes(s[:2].ljust(2,b'\x00'),'little')
+        x = int.from_bytes(s[2:].ljust(2,b'\x00'),'little') if len(s)>2 else 0
+        return pack_tap_entry(j["base"],j["tap"],DBL_SEND_STRING,v,x)
 
 
 def export_config(dev) -> dict:

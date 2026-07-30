@@ -60,87 +60,31 @@ void feature_overview_reset_timer(void) {
 void indicator_draw(void) {
     if (!overview_active) return;
 
-    // Black out all LEDs
     rgb_matrix_set_color_all(0, 0, 0);
 
     // ── Active-layer indicator ──────────────────────────────────────────
-    // Shows the default base layer (Mac/Win switch) plus any layers
-    // toggled via overview.  Combines layer_state and default_layer_state.
     uint8_t base    = get_highest_layer(default_layer_state);
     uint8_t highest = get_highest_layer(layer_state);
-    // If the highest active layer differs from the default, show the
-    // toggled layer; otherwise show the default (mac/win).
     uint8_t display = (highest != base) ? highest : base;
     uint8_t led     = layer_to_led(display);
-    if (led < RGB_MATRIX_LED_COUNT) {
-        rgb_matrix_set_color(led, 255, 255, 255);  // white
-    }
+    if (led < RGB_MATRIX_LED_COUNT)
+        rgb_matrix_set_color(led, 255, 255, 255);
 
-    // ── Feature indicators ──────────────────────────────────────────────
-    // Active  → white (255,255,255)
-    // Inactive → red   (255,0,0)
-
-    // Caps Lock (always shown, hardware state)
-    if (host_keyboard_led_state().caps_lock) {
-        rgb_matrix_set_color(IND_CAPS_LOCK, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_CAPS_LOCK, 255, 0, 0);
-    }
-
-    // Auto-Shift
-    if (feature_auto_shift()) {
-        rgb_matrix_set_color(IND_AUTO_SHIFT, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_AUTO_SHIFT, 255, 0, 0);
-    }
-
-    // Tap Dance
-    if (feature_tap_dance()) {
-        rgb_matrix_set_color(IND_TAP_DANCE, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_TAP_DANCE, 255, 0, 0);
-    }
-
-    // Caps Word
-    if (feature_caps_word()) {
-        rgb_matrix_set_color(IND_CAPS_WORD, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_CAPS_WORD, 255, 0, 0);
-    }
-
-    // Repeat Key
-    if (feature_repeat_key()) {
-        rgb_matrix_set_color(IND_REPEAT_KEY, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_REPEAT_KEY, 255, 0, 0);
-    }
-
-    // Dynamic Macro
-    if (feature_dyn_macro()) {
-        rgb_matrix_set_color(IND_DYN_MACRO, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_DYN_MACRO, 255, 0, 0);
-    }
-
-    // Leader Key
-    if (feature_leader()) {
-        rgb_matrix_set_color(IND_LEADER, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_LEADER, 255, 0, 0);
-    }
-
-    // Auto-correct (from keymap_config)
-    if (keymap_config.autocorrect_enable) {
-        rgb_matrix_set_color(IND_AUTOCORRECT, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_AUTOCORRECT, 255, 0, 0);
-    }
-
-    // NKRO (from QMK core — not a feature flag)
-    if (keymap_config.nkro) {
-        rgb_matrix_set_color(IND_NKRO, 255, 255, 255);
-    } else {
-        rgb_matrix_set_color(IND_NKRO, 255, 0, 0);
+    // ── Feature indicators (active=white, inactive=red) ────────────────
+    typedef struct { uint8_t led; bool active; } ind_t;
+    ind_t list[] = {
+        { IND_CAPS_LOCK,   host_keyboard_led_state().caps_lock         },
+        { IND_AUTO_SHIFT,  feature_auto_shift()                       },
+        { IND_TAP_DANCE,   feature_tap_dance()                        },
+        { IND_CAPS_WORD,   feature_caps_word()                        },
+        { IND_REPEAT_KEY,  feature_repeat_key()                       },
+        { IND_DYN_MACRO,   feature_dyn_macro()                        },
+        { IND_LEADER,      feature_leader()                           },
+        { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
+        { IND_NKRO,        keymap_config.nkro                         },
+    };
+    for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
+        rgb_matrix_set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
     }
 }
 
