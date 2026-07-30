@@ -38,3 +38,7 @@ void layer_visualizer_lock_toggle(void);
 
 /// Returns true if the layer-visualization lock is currently active.
 bool layer_visualizer_is_locked(void);
+
+/// Cancel any ongoing visualization (moment mode, timer mode, lock).
+/// Called when overview mode is entered.
+void layer_visualizer_cancel(void);
