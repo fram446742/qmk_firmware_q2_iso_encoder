@@ -34,6 +34,9 @@ void    feature_set(uint8_t flag, bool on);
 #define feature_toggle_repeat_key()     feature_toggle(FEATURE_REPEAT_KEY)
 #define feature_toggle_dyn_macro()      feature_toggle(FEATURE_DYN_MACRO)
 #define feature_toggle_leader()         feature_toggle(FEATURE_LEADER)
+#define feature_toggle_layer_vis()      feature_toggle(FEATURE_LAYER_VIS)
+
+#define feature_layer_vis()             feature_has(FEATURE_LAYER_VIS)
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Tap-dance transparent override  (timer-based, no TAP_DANCE_ENABLE)
