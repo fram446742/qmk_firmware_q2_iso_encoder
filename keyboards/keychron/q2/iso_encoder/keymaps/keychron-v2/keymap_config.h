@@ -367,6 +367,9 @@ enum combo_events {
 #define IND_NKRO        50
 // #define IND_NKRO       POS_IDX_KC_N
 
+// Layer-visualization lock indicator (9 key, LED index 9)
+#define IND_VIS_LOCK    9
+
 // ═════════════════════════════════════════════════════════════════════════════
 // LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows
 // ═════════════════════════════════════════════════════════════════════════════

@@ -91,18 +91,12 @@ static key_category_t categorize(uint16_t kc) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 static const uint8_t PROGMEM cat_colors[12][3] = {
-    [CAT_BYPASS]    = LV_COLOR_BYPASS,
-    [CAT_BLANK]     = LV_COLOR_BLANK,
-    [CAT_MODIFIER]  = LV_COLOR_MODIFIER,
-    [CAT_MAC_EXTRA] = LV_COLOR_MAC_EXTRA,
-    [CAT_FUNCTION]  = LV_COLOR_FUNCTION,
-    [CAT_BASIC]     = LV_COLOR_BASIC,
-    [CAT_MEDIA]     = LV_COLOR_MEDIA,
-    [CAT_MACRO]     = LV_COLOR_MACRO,
-    [CAT_SPECIAL]   = LV_COLOR_SPECIAL,
-    [CAT_LIGHT]     = LV_COLOR_LIGHT,
-    [CAT_CUSTOM]    = LV_COLOR_CUSTOM,
-    [CAT_LAYER]     = LV_COLOR_LAYER,
+    [CAT_BYPASS]    = LV_COLOR_BYPASS,    [CAT_BLANK]     = LV_COLOR_BLANK,
+    [CAT_MODIFIER]  = LV_COLOR_MODIFIER,  [CAT_MAC_EXTRA] = LV_COLOR_MAC_EXTRA,
+    [CAT_FUNCTION]  = LV_COLOR_FUNCTION,  [CAT_BASIC]     = LV_COLOR_BASIC,
+    [CAT_MEDIA]     = LV_COLOR_MEDIA,     [CAT_MACRO]     = LV_COLOR_MACRO,
+    [CAT_SPECIAL]   = LV_COLOR_SPECIAL,   [CAT_LIGHT]     = LV_COLOR_LIGHT,
+    [CAT_CUSTOM]    = LV_COLOR_CUSTOM,    [CAT_LAYER]     = LV_COLOR_LAYER,
 };
 
 // ── Per-LED color cache ─────────────────────────────────────────────────
@@ -134,26 +128,35 @@ static void apply_cache(void) {
     }
 }
 
+
+
 // ═════════════════════════════════════════════════════════════════════════════
 // State
 // ═════════════════════════════════════════════════════════════════════════════
-// ═════════════════════════════════════════════════════════════════════════════
+//
+// MO key detection uses a HYBRID approach:
+//   - PRESS: process_record_user detects IS_QK_MOMENTARY reliably because
+//            the MO layer hasn't been added when the keycode resolves.
+//   - RELEASE: layer_state_set_user detects which layer bit was removed.
+//            This works even if the resolved keycode changed due to another
+//            MO altering the layer stack.
+//
+// A counter tracks how many MO keys are currently held.  The draw function
+// reads get_highest_layer(layer_state) live during moment mode, so it always
+// shows the correct layer regardless of which MO is held.
 
-static bool   perm_active   = false;
-static uint32_t perm_start  = 0;
-static bool   moment_active = false;
-static uint8_t vis_layer    = 0;
+static bool     perm_active   = false;
+static uint32_t perm_start    = 0;
+static bool     moment_active = false;
+static uint8_t  vis_layer     = 0;  ///< cached layer for timer mode only
+static uint8_t  mo_counter    = 0;  ///< how many MO keys held
+static bool     vis_locked    = false;  ///< lock: no auto-hide until next layer change
 
-// Suppress visualization during init.  boot_done is set by init(), but
-// the initial layer_move() in matrix_scan_user's default-layer sync also
-// fires a trigger.  boot_done stays false until AFTER that sync completes.
-// init() records the initial default layer so we can detect the sync.
+// Suppress visualization during init.
 static bool   boot_done = false;
 static uint8_t boot_default_layer = 0;
 
-// When an MO key is released, QMK processes the layer change AFTER
-// process_record_user returns.  This flag tells the next trigger() call
-// that it's caused by an MO release, so it should NOT start the timer.
+// Suppress timer restart on last-MO-release cleanup.
 static bool mo_release_pending = false;
 
 
@@ -161,52 +164,88 @@ static bool mo_release_pending = false;
 // Public API
 // ═════════════════════════════════════════════════════════════════════════════
 
+void layer_visualizer_momentary_start(void) {
+    if (!feature_layer_vis()) return;
+    if (feature_overview_is_active()) return;
+
+    if (mo_counter == 0) {
+        // First MO press — enter moment mode
+        moment_active = true;
+        perm_active   = false;
+        vis_cache_valid = false;
+    }
+    mo_counter++;
+}
+
+void layer_visualizer_momentary_stop(void) {
+    if (!feature_layer_vis()) return;
+    if (mo_counter == 0) return;
+
+    mo_counter--;
+    if (mo_counter == 0) {
+        // Last MO released — exit moment mode.
+        // The caller (layer_state_set_user) has already set mo_release_pending
+        // so the upcoming trigger() doesn't start the timer.
+        moment_active = false;
+        vis_cache_valid = false;
+    }
+}
+
+/// Called from layer_state_set_user when a layer bit was removed.
+/// This is the authoritative MO-release detection path: QMK removed the
+/// layer before calling this hook, so the layer state is already correct.
+void layer_visualizer_mo_released(void) {
+    if (!feature_layer_vis()) return;
+
+    // Decrement the MO counter (if any MO was held)
+    if (mo_counter > 0) {
+        mo_counter--;
+        if (mo_counter == 0) {
+            // Last MO released
+            moment_active = false;
+            vis_cache_valid = false;
+            mo_release_pending = true;
+        }
+        // If counter > 0, other MO(s) still held — draw() reads live layer.
+        // Invalidate cache so the new live layer's colors are recomputed.
+        if (moment_active) {
+            vis_cache_valid = false;
+        }
+    }
+}
+
 void layer_visualizer_trigger(void) {
     if (!feature_layer_vis()) return;
 
-    // Suppress triggers during boot.  The first trigger is the initial
-    // default-layer sync which we skip (boot_done still false here).
     if (!boot_done) {
-        // Pop the guard: if this layer change is NOT the initial sync
-        // (i.e. someone changes layer before matrix_scan runs), allow it.
         if (get_highest_layer(layer_state) != boot_default_layer) {
             boot_done = true;
         }
         return;
     }
 
-    // Suppress trigger if it's the result of an MO key release.
-    // The flag is set by momentary_stop() and consumed here.
+    // Last MO release cleanup — skip timer start.
     if (mo_release_pending) {
         mo_release_pending = false;
-        vis_layer = get_highest_layer(layer_state);  // still update in case
-        return;  // but don't restart the timer
+        vis_layer = get_highest_layer(layer_state);
+        if (vis_locked) {
+            // Locked: keep showing indefinitely
+            perm_active = true;
+            vis_cache_valid = false;
+        }
+        return;
     }
 
-    if (moment_active) return;
+    if (moment_active) {
+        vis_cache_valid = false;
+        return;
+    }
 
+    // Non-MO layer change (TO, TG, DF, layer_set) — update display.
     vis_layer   = get_highest_layer(layer_state);
     vis_cache_valid = false;
     perm_active = true;
     perm_start  = timer_read32();
-}
-
-void layer_visualizer_momentary_start(uint8_t target_layer) {
-    if (!feature_layer_vis()) return;
-    if (feature_overview_is_active()) return;  // don't override overview
-
-    moment_active = true;
-    vis_layer     = target_layer;
-    vis_cache_valid = false;
-    perm_active   = false;
-}
-
-void layer_visualizer_momentary_stop(void) {
-    moment_active = false;
-    vis_cache_valid = false;  // next draw will rebuild for the permanent layer
-    // Mark the upcoming layer-state change (triggered by QMK processing
-    // the MO release) as something to ignore.
-    mo_release_pending = true;
 }
 
 bool layer_visualizer_is_active(void) {
@@ -230,6 +269,7 @@ void layer_visualizer_sync_complete(void) {
 void layer_visualizer_task(void) {
     if (moment_active)          return;
     if (!perm_active)           return;
+    if (vis_locked)             return;  // locked: no auto-hide
     if (timer_elapsed32(perm_start) > LAYER_VIS_TIMEOUT_MS) {
         perm_active = false;
     }
@@ -242,9 +282,27 @@ void layer_vis_toggle(void) {
     }
 }
 
+void layer_visualizer_lock_toggle(void) {
+    vis_locked = !vis_locked;
+    if (vis_locked) {
+        // Enter locked mode: start permanent display of current layer
+        vis_layer   = get_highest_layer(layer_state);
+        perm_active = true;
+        perm_start  = timer_read32();  // start timer (won't expire while locked)
+        vis_cache_valid = false;
+    } else {
+        // Unlocking: turn off the overlay
+        perm_active = false;
+    }
+}
+
+bool layer_visualizer_is_locked(void) {
+    return vis_locked;
+}
+
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Drawing  (uses cached per-LED colors)
+// Drawing
 // ═════════════════════════════════════════════════════════════════════════════
 
 static void draw_layer(uint8_t layer) {
@@ -253,5 +311,11 @@ static void draw_layer(uint8_t layer) {
 }
 
 void layer_visualizer_draw(void) {
-    draw_layer(vis_layer);
+    if (moment_active) {
+        // During MO holds, always read QMK's live layer state.
+        uint8_t live = get_highest_layer(layer_state);
+        draw_layer(live);
+    } else {
+        draw_layer(vis_layer);
+    }
 }

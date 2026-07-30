@@ -154,7 +154,8 @@ white=ON, red=OFF.
 | **D** | Toggle Dynamic Macro processing |
 | **L** | Toggle Leader Key processing |
 | **N** | Toggle NKRO |
-| **0-9** | `layer_move(N)` — same layer returns to default |
+| **0-8** | `layer_move(N)` — same layer returns to default |
+| **9** | Toggle **layer-visualization lock** (shows key categories permanently until next layer change) |
 | **any other key** | Exit overview |
 
 ### Indicator LED map
@@ -162,6 +163,7 @@ white=ON, red=OFF.
 | LED | Key | Meaning |
 |---|---|---|
 | 10/1-8 | Number row | Active layer (highest in `layer_state`) |
+| 9 | 9 key | Layer-visualization lock ON |
 | 29 | A | Auto-Shift ON |
 | 30 | S | Auto-Correct ON |
 | 19 | T | Tap Dance ON |
@@ -171,7 +173,10 @@ white=ON, red=OFF.
 | 37 | L | Leader Key ON |
 | 50 | N | NKRO ON |
 
-All indicator LEDs: white=active, red=inactive.
+All indicator LEDs: white=active, red=inactive.  The layer-vis lock indicator
+shows white when the overview is shown in locked mode.  When locked, the
+color overlay stays on indefinitely until the next layer change — the timer
+never expires.
 
 ## Feature flags
 
