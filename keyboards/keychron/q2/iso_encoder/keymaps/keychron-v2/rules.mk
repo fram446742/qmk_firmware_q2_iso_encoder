@@ -35,6 +35,7 @@ LTO_ENABLE = yes
 SRC += features.c
 SRC += indicators.c
 
-# Auto-generate autocorrect_data.h from typos.txt every build.
-# Edit typos.txt, rebuild — the header is regenerated automatically.
-$(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)
+# Auto-generate autocorrect_data.h + key_positions.h at build time
+DUMMY := $(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)
+DUMMY := $(shell python3 $(KEYMAP_PATH)/gen_key_positions.py 2>/dev/null)
+

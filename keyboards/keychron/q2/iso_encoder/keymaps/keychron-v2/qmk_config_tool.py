@@ -36,7 +36,7 @@ def _read_header(name: str) -> dict:
         pass  # caller falls back to hardcoded defaults
     return result
 
-_consts = _read_header('features.h')
+_consts = _read_header('keymap_config.h')
 
 # Protocol value IDs — from features.h, fallback to hardcoded
 VALUE_FLAGS         = _consts.get('VALUE_FLAGS', 0x01)
@@ -162,12 +162,12 @@ _MOD_PREFIXES = {v: k for k, v in _MOD_WRAPPERS.items()}
 # Data structures
 # ═══════════════════════════════════════════════════════════════════════════
 
-def pack_tap_entry(base, tap, dtype, dval, dextra=0):
-    return struct.pack('<HHBBHH', kc_val(base), kc_val(tap), dtype, 0, dval, dextra)
+def pack_tap_entry(base_id, tap, dtype, dval, dextra=0, base_type=0):
+    return struct.pack('<HHBBHH', base_id, kc_val(tap), dtype, base_type, dval, dextra)
 
 def unpack_tap_entry(data):
-    b,t,d,_,v,x = struct.unpack_from('<HHBBHH', data)
-    return b,t,d,v,x
+    base_id,t,d,btype,v,x = struct.unpack_from('<HHBBHH', data)
+    return base_id,t,d,btype,v,x
 
 def pack_combo(keys, out):
     ks = [kc_val(k) for k in keys] + [0]*(4-len(keys))
@@ -320,8 +320,14 @@ def _save(dev):
     dev.send(bytes([VIA_PROTOCOL_SAVE, VIA_CHANNEL, 0, 0]))
 
 
+def mtx_name(pos):
+    """Format a packed matrix position as MTX(row,col)."""
+    r = (pos >> 8) & 0xFF
+    c = pos & 0xFF
+    return f"MTX({r},{c})"
+
 def tap_to_json(data):
-    b,t,d,v,x = unpack_tap_entry(data)
+    base_id,t,d,btype,v,x = unpack_tap_entry(data)
     if d == DBL_KEYCODE:
         dt = "keycode"; dv = kc_name(v)
     elif d == DBL_UNICODE_STR:
@@ -332,28 +338,41 @@ def tap_to_json(data):
         dv = (v.to_bytes(2,'little')+x.to_bytes(2,'little')).rstrip(b'\x00').decode('ascii',errors='replace')
     else:
         dt = "codepoint"; dv = f"U+{(v|x<<16):05X}"
-    return {"base": kc_name(b), "tap": kc_name(t), "double": {"type": dt, "value": dv}}
+    if btype == 1:
+        base = mtx_name(base_id)
+    else:
+        base = kc_name(base_id)
+    return {"base": base, "tap": kc_name(t), "baseType": btype, "double": {"type": dt, "value": dv}}
 
 
 def json_to_tap(j) -> bytes:
-    b, t = kc_val(j["base"]), kc_val(j["tap"])
+    btype = j.get("baseType", 0)
+    if btype == 1:
+        # Matrix position: parse "MTX(r,c)"
+        m = re.match(r'MTX\((\d+),(\d+)\)', j["base"])
+        if not m:
+            raise ValueError(f"Invalid matrix position: {j['base']}")
+        base_id = (int(m.group(1)) << 8) | int(m.group(2))
+    else:
+        base_id = kc_val(j["base"])
+    t = kc_val(j["tap"])
     d = j["double"]
     if d["type"] == "keycode":
-        return pack_tap_entry(j["base"],j["tap"],DBL_KEYCODE,kc_val(d["value"]))
+        return pack_tap_entry(base_id, j["tap"], DBL_KEYCODE, kc_val(d["value"]), base_type=btype)
     elif d["type"] == "unicode":
         s = d["value"].encode('utf-8')[:4]
         v = int.from_bytes(s[:2].ljust(2,b'\x00'),'little')
         x = int.from_bytes(s[2:].ljust(2,b'\x00'),'little') if len(s)>2 else 0
-        return pack_tap_entry(j["base"],j["tap"],DBL_UNICODE_STR,v,x)
+        return pack_tap_entry(base_id, j["tap"], DBL_UNICODE_STR, v, x, base_type=btype)
     elif d["type"] == "codepoint":
         cp_str = d["value"].replace("U+","")
         cp = int(cp_str,16)
-        return pack_tap_entry(j["base"],j["tap"],DBL_UNICODE_CP,cp&0xFFFF,(cp>>16)&0xFFFF)
+        return pack_tap_entry(base_id, j["tap"], DBL_UNICODE_CP, cp&0xFFFF, (cp>>16)&0xFFFF, base_type=btype)
     else:  # string
         s = d["value"].encode('ascii')[:4]
         v = int.from_bytes(s[:2].ljust(2,b'\x00'),'little')
         x = int.from_bytes(s[2:].ljust(2,b'\x00'),'little') if len(s)>2 else 0
-        return pack_tap_entry(j["base"],j["tap"],DBL_SEND_STRING,v,x)
+        return pack_tap_entry(base_id, j["tap"], DBL_SEND_STRING, v, x, base_type=btype)
 
 
 def export_config(dev) -> dict:

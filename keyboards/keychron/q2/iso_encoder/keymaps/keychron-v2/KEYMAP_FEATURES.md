@@ -18,9 +18,11 @@
 | File | Role | Compiled |
 |---|---|---|
 | `keymap.c` | Layers, encoder map, callbacks (`process_record_user`, `matrix_scan_user`), HID handler | main entry |
+| `keymap_config.h` | **Single configuration file** — timings, layers, keycodes, combos, LED indices, EEPROM layout, defaults | included from .c files |
+| `key_positions.h` | **Auto-generated** — `POS_KC_xxx` matrix-position macros from MAC_BASE layer | `$(shell)` in rules.mk |
 | `features.h/c` | Feature flag API, EEPROM config (tap/combos/leaders), tap-dance state machine | `SRC +=` |
 | `indicators.h/c` | RGB indicator drawing, feature overview trigger/state | `SRC +=` |
-| `combos.h/c` | Custom keycodes, combo definitions (included from keymap.c) | `#include` |
+| `combos.c` | Combo array (keys + actions from `keymap_config.h`) | `#include` from keymap.c |
 
 ## Layers
 
@@ -38,20 +40,26 @@
 ## Tap Dance (transparent override)
 
 Custom timer-based state machine in `features.c` — no QMK `TAP_DANCE_ENABLE`.
-Intercepts base keycodes before QMK processes them. All keycodes stay plain
-(e.g. `KC_BSPC`, `KC_ESC`, `KC_E`) — VIA shows proper names.
+Intercepts keys before QMK processes them. Uses **matrix position** matching
+by default (`base_type=1`), so overrides follow the physical key regardless
+of what keycode it sends on the current layer.
 
-| Key | Single tap | Double tap | Type |
-|---|---|---|---|
-| `KC_BSPC` | Backspace | `KC_DEL` | keycode |
-| `KC_ESC` | Escape | `CW_TOGG` (Caps Word) | keycode |
-| `KC_E` | `e` | `€` (U+20AC) | Unicode CP |
-| `KC_2` | `2` | `@` | Unicode string |
-| `KC_4` | `4` | `~` | Unicode string |
+Default entries are defined in `keymap_config.h` via `TAP_DEFAULTS`. Each
+entry targets a physical position using the `POS_KC_xxx` macros from
+auto-generated `key_positions.h`:
 
-**Defaults are in EEPROM** — loaded from `features_load_defaults()` in
-`features.c`. Editable at runtime via `qmk_config_tool.py`. The toggle history
-button (T in overview) enables/disables the entire feature.
+```c
+#define TAP_DEFAULTS \
+    {.base_id=POS_KC_BSPC, .tap_kc=KC_BSPC, .base_type=1, ..., .dbl_val=KC_DEL}, \
+    {.base_id=POS_KC_E,    .tap_kc=KC_E,    .base_type=1, ..., .dbl_val=RALT(KC_E)},
+    {0}  /* sentinel */
+```
+
+To override by **keycode** instead (follows the keycode label across layout
+changes), set `base_type=0` and use a `KC_xxx` value for `base_id`.
+
+Editable at runtime via `qmk_config_tool.py`. The T key in overview mode
+toggles the entire feature.
 
 ### OS Unicode requirement
 
@@ -153,15 +161,19 @@ Mac layers → `Cmd+key`, Windows layers → `Ctrl+key`.
 
 Beyond VIA's dynamic keymap and macro buffer:
 
-| Offset | Size | Content |
+| Address | Size | Content |
 |---|---|---|
-| **8100** | 1B | Feature flags (bitmask, see above) |
-| 8101 | 1B | Tap override count |
-| 8102-8301 | 200B | Tap override entries (20 × 10B `eeprom_tap_t`) |
-| 8302 | 1B | Combo count |
-| 8303-8366 | 64B | Combo entries (8 × 8B `eeprom_combo_t`) |
-| 8367 | 1B | Leader count |
-| 8368-8463 | 96B | Leader entries (16 × 6B `eeprom_leader_t`) |
+| `EEP_FEATURES` (8100) | 1B | Feature flags (bitmask, see above) |
+| `EEP_TAP_BASE` | 1B | Tap override count |
+| `EEP_TAP_BASE + 1` | `EEP_TAP_SIZE` | Tap override entries |
+| `EEP_COMBO_BASE` | 1B | Combo count |
+| `EEP_COMBO_BASE + 1` | `EEP_COMBO_SIZE` | Combo entries |
+| `EEP_LEADER_BASE` | 1B | Leader count |
+| `EEP_LEADER_BASE + 1` | `EEP_LEADER_SIZE` | Leader entries |
+
+All addresses are derived from `EEP_FEATURES` (8100). Change `MAX_TAP_OVERRIDES`,
+`MAX_COMBOS`, `MAX_LEADERS`, or any `eeprom_*` struct and everything adjusts
+automatically. See `keymap_config.h` for the exact calculations.
 
 First boot detection: if byte 8100 is 0xFF or 0x00, all entries are
 initialized with defaults and written to EEPROM.

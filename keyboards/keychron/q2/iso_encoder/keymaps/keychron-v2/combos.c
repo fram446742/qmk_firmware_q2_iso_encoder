@@ -1,18 +1,15 @@
 /* Copyright 2025 Franc
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
-// NOTE: This file is #included from keymap.c, NOT compiled separately.
-// It needs QMK_KEYBOARD_H and quantum includes already visible via keymap.c.
-
-#include "combos.h"
+// NOTE: #included from keymap.c, not compiled separately.
+// keymap_config.h must be included before this file.
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Combo definitions
+// Combo definitions  —  keys and actions from keymap_config.h
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Feature overview: O + P simultaneously
-const uint16_t PROGMEM cb_feat_overview[]   = {KC_O, KC_P, COMBO_END};
+const uint16_t PROGMEM cb_feat_overview[] = COMBO_FEAT_OVERVIEW_KEYS;
 
 combo_t key_combos[] = {
-    [CB_FEAT_OVERVIEW]   = COMBO(cb_feat_overview,   KC_FEAT_OVERVIEW),
+    [CB_FEAT_OVERVIEW] = COMBO(cb_feat_overview, COMBO_FEAT_OVERVIEW_ACTION),
 };

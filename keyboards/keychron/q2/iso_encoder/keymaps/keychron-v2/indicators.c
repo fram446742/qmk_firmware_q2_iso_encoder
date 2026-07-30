@@ -1,30 +1,35 @@
 /* Copyright 2025 Franc
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include QMK_KEYBOARD_H
+#include "keychron_common.h"
 #include "indicators.h"
 #include "features.h"
-#include "quantum.h"  // keymap_config_t, rgb_matrix_*, timer_*, layer_state
+#include "keymap_config.h"
 
-// ── Overview state ──────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// Overview state
+// ═════════════════════════════════════════════════════════════════════════════
+
 static bool     overview_active   = false;
 static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
 
-// Configurable overview duration (ms).  Set to 0 for no timeout.
-#define OVERVIEW_TIMEOUT_MS 10000
+// ═════════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═════════════════════════════════════════════════════════════════════════════
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-// Show the default base layer.  default_layer_state tracks Mac (0) vs Win (1).
-// Layer 0 → key "0" (LED 10), layer 1 → key "1" (LED 1), layer N→key N (LED N).
+// Layer 0 → key "0" (LED 10), layer N → key N (LED N, 1-9)
 static uint8_t layer_to_led(uint8_t layer) {
-    if (layer == 0) return 10;   // key "0"
-    if (layer >= 1 && layer <= 9) return layer;  // keys "1"–"9"
+    if (layer == 0) return 10;
+    if (layer >= 1 && layer <= 9) return layer;
     return 255;
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// Public API
+// ═════════════════════════════════════════════════════════════════════════════
 
 void feature_overview_trigger(void) {
     if (overview_active) return;
@@ -55,7 +60,9 @@ void feature_overview_reset_timer(void) {
     }
 }
 
-// ── Per-frame drawing ───────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// Per-frame drawing
+// ═════════════════════════════════════════════════════════════════════════════
 
 void indicator_draw(void) {
     if (!overview_active) return;
@@ -88,7 +95,9 @@ void indicator_draw(void) {
     }
 }
 
-// ── Per-loop timeout check ──────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// Per-loop timeout check
+// ═════════════════════════════════════════════════════════════════════════════
 
 void indicator_task(void) {
     if (overview_active && timer_elapsed32(overview_start) > OVERVIEW_TIMEOUT_MS) {
