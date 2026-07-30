@@ -263,7 +263,10 @@ void layer_visualizer_init(void) {
 // This allows the FIRST layer trigger (which happens during that sync)
 // to be suppressed — we don't show visualization for boot setup.
 void layer_visualizer_sync_complete(void) {
-    boot_done = true;
+    boot_done    = true;
+    moment_active = false;
+    perm_active   = false;
+    mo_counter    = 0;
 }
 
 void layer_visualizer_task(void) {
@@ -280,6 +283,15 @@ void layer_vis_toggle(void) {
     if (feature_layer_vis()) {
         layer_visualizer_trigger();
     }
+}
+
+void layer_visualizer_cancel(void) {
+    moment_active = false;
+    perm_active   = false;
+    vis_locked    = false;
+    mo_counter    = 0;
+    mo_release_pending = false;
+    vis_cache_valid = false;
 }
 
 void layer_visualizer_lock_toggle(void) {

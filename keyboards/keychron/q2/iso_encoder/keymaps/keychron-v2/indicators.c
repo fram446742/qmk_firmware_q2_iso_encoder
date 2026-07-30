@@ -47,6 +47,10 @@ void feature_overview_trigger(void) {
     saved_rgb_mode    = rgb_matrix_config.mode;
     saved_rgb_enabled = rgb_matrix_config.enable;
 
+    // Cancel any ongoing layer visualization (moment or timer mode)
+    // so it doesn't leak into overview mode.
+    layer_visualizer_cancel();
+
     overview_active = true;
     overview_start  = timer_read32();
 
