@@ -79,6 +79,16 @@
 #define MAX_TAP_OVERRIDES  20
 #define MAX_COMBOS          8
 #define MAX_LEADERS        16
+#define MAX_POS_COMBOS      8     ///< Position-based (custom processor) combos
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// COMBO TIMING
+// ═════════════════════════════════════════════════════════════════════════════
+
+#ifndef COMBO_TERM
+#    define COMBO_TERM 50  ///< ms window for combo key chords (QMK default)
+#endif
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -122,6 +132,26 @@ typedef struct __attribute__((packed)) {
     uint8_t  mod;         ///< QMK MOD_* value, not a keycode (e.g. MOD_LGUI = 0x08)
     uint16_t key;         ///< final keycode to fire
 } eeprom_leader_t;
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POSITION-BASED COMBO  —  custom processor, not QMK's native combo system
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Processed in features_combo_process() before QMK's native process_combo.
+// Supports both keycode matching (base_type=0) and matrix-position matching
+// (base_type=1, using PACK_MTX/ POS_KC_xxx values).  Position-based combos
+// follow the physical key regardless of what keycode is on the current layer.
+
+typedef struct {
+    uint8_t  key_count;   ///< number of keys in this combo (1-4)
+    uint8_t  base_type;   ///< 0=keycode (keys[] are KC_xxx), 1=matrix position (keys[] are PACK_MTX)
+    uint16_t keys[4];     ///< values to match; unused entries = 0
+    uint16_t output;      ///< keycode to fire when all keys held
+} pos_combo_def_t;
+
+#define POS_COMBO(count, type, out, ...) \
+    { .key_count = (count), .base_type = (type), .keys = {__VA_ARGS__}, .output = (out) }
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -212,6 +242,9 @@ typedef struct __attribute__((packed)) {
 
 #define KEYMAP_LAYER_COUNT  9
 
+// VIA/ dynamic-macro counts live at the bottom of this file (via #ifndef
+// fallbacks).  The actual overrides must be in config.h for include order.
+
 enum layers {
     MAC_BASE,
     WIN_BASE,
@@ -255,7 +288,15 @@ enum combo_events {
 // COMBO DEFINITIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
-#define COMBO_FEAT_OVERVIEW_KEYS    {POS_KC_O, POS_KC_LBRC, COMBO_END}
+// ── QMK-native (keycode-based, processed by QMK's process_combo) ─────────
+// Keys are KC_xxx values.  Only fires on layers where both keycodes exist.
+#define COMBO_FEAT_OVERVIEW_KEYS    {KC_O, KC_LBRC, COMBO_END}
+
+// ── Position-based (handled by features_combo_process in process_record_user)
+// Keys are POS_KC_xxx (packed matrix positions).  Fires on any layer since
+// it matches by physical key location, not current keycode.
+#define POS_COMBOS_DEFS \
+    POS_COMBO(2, BASE_IS_MATRIX, KC_FEAT_OVERVIEW, POS_KC_O, POS_KC_LBRC),
 #define COMBO_FEAT_OVERVIEW_ACTION   KC_FEAT_OVERVIEW
 
 
@@ -337,9 +378,3 @@ enum combo_events {
 // The leader timer (LEADER_TIMEOUT in quantum/leader.h) defaults to 300ms.
 
 #define LEADER_MOD(on_mac, base_kc)  ((on_mac) ? LGUI(base_kc) : LCTL(base_kc))
-
-
-// NOTE: VIA overrides (DYNAMIC_KEYMAP_LAYER_COUNT, DYNAMIC_KEYMAP_MACRO_COUNT)
-// are in config.h — they must be visible before QMK_KEYBOARD_H is included,
-// so they can't live in this file.  Keep config.h in sync with KEYMAP_LAYER_COUNT
-// above.

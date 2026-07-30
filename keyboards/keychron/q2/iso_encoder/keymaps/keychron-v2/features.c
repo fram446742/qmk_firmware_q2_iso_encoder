@@ -156,7 +156,119 @@ void features_tap_task(void) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Feature flag management
+// Position-based combo processor  (custom, not QMK native process_combo)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Handles combos defined with matrix positions (POS_KC_xxx) so they work
+// on any layer.  Processed in process_record_user BEFORE QMK's native
+// process_combo — position combos are consumed here; keycode combos fall
+// through to QMK.
+//
+// QMK's native combo system (key_combos[] in combos.c) only matches on
+// KC_xxx keycodes.  This processor adds a second path that matches on
+// position, using the same POS_KC_xxx macros from
+// key_positions.h that the tap-dance override uses.
+
+// Runtime state: one entry per position combo
+static struct {
+    uint8_t  down;         ///< bitmask: which keys are currently held
+    uint16_t timer;        ///< timer when first key went down
+    bool     fired;        ///< output was already sent
+} pos_cb_state[MAX_POS_COMBOS];
+
+// Compiled-in position combo definitions from keymap_config.h
+static const pos_combo_def_t pos_combos[MAX_POS_COMBOS] = {
+    POS_COMBOS_DEFS
+};
+
+// Number of entries in pos_combos (compile-time)
+#define POS_COMBO_COUNT ((uint8_t)(sizeof(pos_combos) / sizeof(pos_combos[0])))
+
+bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
+    uint8_t mtx_pos = PACK_MTX(record->event.key.row, record->event.key.col);
+
+    for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+        const pos_combo_def_t *cb = &pos_combos[ci];
+
+        // ── Check if this key belongs to this combo ────────────────────
+        uint8_t ki;  // key index within combo
+        for (ki = 0; ki < cb->key_count; ki++) {
+            bool match;
+            if (cb->base_type == BASE_IS_MATRIX) {
+                match = (cb->keys[ki] == mtx_pos);
+            } else {
+                match = (cb->keys[ki] == keycode);
+            }
+            if (match) break;
+        }
+        if (ki >= cb->key_count) continue;  // not part of this combo
+
+        uint8_t bit = (1 << ki);
+
+        if (record->event.pressed) {
+            pos_cb_state[ci].down |= bit;
+
+            if (pos_cb_state[ci].down == (uint8_t)((1 << cb->key_count) - 1)) {
+                // All keys now held — fire the combo
+                pos_cb_state[ci].fired = true;
+                pos_cb_state[ci].down  = 0;
+                tap_code16(cb->output);
+                return false;
+            }
+
+            // First key down: start the timer
+            if (pos_cb_state[ci].timer == 0) {
+                pos_cb_state[ci].timer = timer_read();
+            }
+
+            // Always consume the press — if the combo doesn't complete,
+            // the timer expiry will re-press the individual keys.
+            return false;
+
+        } else {
+            // Key release
+            if (pos_cb_state[ci].fired) {
+                // Combo already fired — consume all releases
+                pos_cb_state[ci].down  = 0;
+                pos_cb_state[ci].timer = 0;
+                pos_cb_state[ci].fired = false;
+                return false;
+            }
+
+            // Combo not yet complete — key released early.  Clear timer
+            // so the next press starts fresh (avoids partial-chord issues
+            // when typing quickly).
+            pos_cb_state[ci].down  = 0;
+            pos_cb_state[ci].timer = 0;
+            pos_cb_state[ci].fired = false;
+
+            // Don't consume: let the key release through so single-key
+            // taps on a combo member still register normally.
+            return true;
+        }
+    }
+
+    return true;  // not handled
+}
+
+void features_combo_task(void) {
+    // Timeout: if a position combo was started but not completed within
+    // COMBO_TERM, release the held keys so they register as single taps.
+    for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+        if (pos_cb_state[ci].down && !pos_cb_state[ci].fired) {
+            if (timer_elapsed(pos_cb_state[ci].timer) > COMBO_TERM) {
+                // Re-play each held key as a single tap
+                for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
+                    if (pos_cb_state[ci].down & (1 << ki)) {
+                        tap_code16(pos_combos[ci].keys[ki]);
+                    }
+                }
+                pos_cb_state[ci].down  = 0;
+                pos_cb_state[ci].timer = 0;
+            }
+        }
+    }
+}
 // ═════════════════════════════════════════════════════════════════════════════
 
 static void feature_apply_flag(uint8_t flag) {

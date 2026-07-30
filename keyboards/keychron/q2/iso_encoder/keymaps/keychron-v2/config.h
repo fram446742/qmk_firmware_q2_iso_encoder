@@ -9,6 +9,6 @@
 #undef  DYNAMIC_KEYMAP_LAYER_COUNT
 #define DYNAMIC_KEYMAP_LAYER_COUNT 9
 
-// Increase macro slots from default 16 to 32
+// We limit by actual macro keycode range (0xF0-0xFF = 16).  This is the default.
 #undef  DYNAMIC_KEYMAP_MACRO_COUNT
-#define DYNAMIC_KEYMAP_MACRO_COUNT 32
+#define DYNAMIC_KEYMAP_MACRO_COUNT 16

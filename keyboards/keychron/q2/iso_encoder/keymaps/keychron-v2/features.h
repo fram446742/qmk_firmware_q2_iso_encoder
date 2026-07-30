@@ -49,6 +49,16 @@ bool features_tap_process(uint16_t keycode, keyrecord_t *record);
 void features_tap_task(void);
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Position-based combo processor  (custom, not QMK native)
+// ═════════════════════════════════════════════════════════════════════════════
+// Matches by matrix position (POS_KC_xxx) or keycode (KC_xxx), with type
+// controlled by base_type in pos_combo_def_t.  Run from process_record_user
+// BEFORE QMK's native process_combo for position-based combos.
+
+bool features_combo_process(uint16_t keycode, keyrecord_t *record);
+void features_combo_task(void);
+
+// ═════════════════════════════════════════════════════════════════════════════
 // EEPROM-backed config arrays  (extern declarations)
 // ═════════════════════════════════════════════════════════════════════════════
 // Struct types, EEPROM addresses, and HID protocol constants are in

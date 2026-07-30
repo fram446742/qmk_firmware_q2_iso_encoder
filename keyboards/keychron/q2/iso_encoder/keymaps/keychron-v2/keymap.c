@@ -162,6 +162,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         if (!features_tap_process(keycode, record)) return false;
     }
 
+    // ── Position-based combo processor (before overview, before QMK) ───
+    // Catches chords like O+P by matrix position so they work on any layer.
+    if (!features_combo_process(keycode, record)) return false;
+
     // ── Interactive overview mode ───────────────────────────────────────
     if (record->event.pressed && feature_overview_is_active()) {
         uint8_t r = record->event.key.row;
@@ -307,6 +311,7 @@ void matrix_scan_user(void) {
     indicator_task();
     layer_visualizer_task();
     features_tap_task();
+    features_combo_task();
 
     if (last_default_layer != default_layer_state) {
         last_default_layer = default_layer_state;
