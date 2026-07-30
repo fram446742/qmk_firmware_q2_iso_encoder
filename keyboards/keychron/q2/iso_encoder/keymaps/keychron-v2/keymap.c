@@ -298,6 +298,7 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
 
 void keyboard_post_init_user(void) {
     features_init();
+    layer_visualizer_init();
 }
 
 static layer_state_t last_default_layer = 0;
@@ -310,6 +311,15 @@ void matrix_scan_user(void) {
     if (last_default_layer != default_layer_state) {
         last_default_layer = default_layer_state;
         layer_move(get_highest_layer(default_layer_state));
+    }
+
+    // First scan completion: allows layer visualization triggers.
+    // Must run after the initial default-layer sync above.
+    // Use a static flag so this only runs once.
+    static bool first_scan = true;
+    if (first_scan) {
+        first_scan = false;
+        layer_visualizer_sync_complete();
     }
 }
 

@@ -1,4 +1,5 @@
 /* Auto-generated from keyboard.json + keymap.c MAC_BASE layer
+ * Layout: LAYOUT_iso_68, 68 entries, encoder=True
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
@@ -211,8 +212,8 @@
 
 // Total: 66 keys
 
-// ── LED-index → matrix-position lookup ──────────────────────────
-// Keys without an RGB LED (e.g. rotary encoder) are excluded.
+// ── LED-index → matrix-position lookup (for layer visualization) ──
+// 68 layout entries, 67 with LEDs (1 skipped)
 static const uint16_t PROGMEM led_to_mtx[67] = {
     PACK_MTX(0, 0),
     PACK_MTX(0, 1),
