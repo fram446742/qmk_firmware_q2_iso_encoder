@@ -6,6 +6,7 @@
 #include "indicators.h"
 #include "features.h"
 #include "keymap_config.h"
+#include "layer_visualizer.h"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Overview state
@@ -20,10 +21,11 @@ static bool     saved_rgb_enabled = false;
 // Layer ↔ LED mapping
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Layer 0 → key "0" (LED 10), layer N → key N (LED N, 1-9)
+// Layer 0 → key "0" (LED 10), layers 1-8 → keys 1-8
+// LED 9 is reserved for the layer-visualization lock indicator.
 uint8_t layer_to_led(uint8_t layer) {
     if (layer == 0) return 10;
-    if (layer >= 1 && layer <= 9) return layer;
+    if (layer >= 1 && layer <= 8) return layer;
     return 255;
 }
 
@@ -93,6 +95,7 @@ void indicator_draw(void) {
         { IND_LEADER,      feature_leader()                           },
         { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
         { IND_NKRO,        keymap_config.nkro                         },
+        { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
     };
     for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
         rgb_matrix_set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);

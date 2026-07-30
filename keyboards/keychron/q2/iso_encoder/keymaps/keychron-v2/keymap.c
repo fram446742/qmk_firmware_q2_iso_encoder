@@ -192,7 +192,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case (0 << 4) | 6:  LAYER_MOVE_OR_DEFAULT(6);  feature_overview_reset_timer(); return false;
             case (0 << 4) | 7:  LAYER_MOVE_OR_DEFAULT(7);  feature_overview_reset_timer(); return false;
             case (0 << 4) | 8:  LAYER_MOVE_OR_DEFAULT(8);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 9:  LAYER_MOVE_OR_DEFAULT(9);  feature_overview_reset_timer(); return false;
+            case (0 << 4) | 9:  layer_visualizer_lock_toggle(); feature_overview_reset_timer(); return false;
             default:            feature_overview_cancel();  return false;
         }
     }
@@ -206,15 +206,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // ── Layer visualization: detect MO() key holds ────────────────────
-    // Momentary layer keys show their target layer while held (no timer).
-    if (IS_QK_MOMENTARY(keycode)) {
-        if (record->event.pressed) {
-            layer_visualizer_momentary_start(QK_MOMENTARY_GET_LAYER(keycode));
-        } else {
-            layer_visualizer_momentary_stop();
-        }
-        // Don't consume — let QMK process the MO key normally
+    // ── Layer visualization: detect MO() key press ──────────────────
+    // PRESS detection is reliable here because the MO layer hasn't been
+    // added to the stack yet — IS_QK_MOMENTARY(keycode) resolves correctly.
+    // RELEASE is handled in layer_state_set_user (detects the layer bit
+    // being removed), so we don't handle it here.
+
+    if (record->event.pressed && IS_QK_MOMENTARY(keycode)) {
+        layer_visualizer_momentary_start();
     }
 
     return true;
@@ -226,6 +225,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 layer_state_t layer_state_set_user(layer_state_t state) {
+    // Detect MO release: a layer bit was removed.  This works even if
+    // the resolved keycode changed because another MO altered the stack.
+    layer_state_t removed = layer_state & ~state;
+    if (removed) {
+        layer_visualizer_mo_released();
+    }
+
+    // Trigger timer-based vis for non-MO layer changes (TO, TG, DF),
+    // and update moment-mode display after MO press/release.
     layer_visualizer_trigger();
     return state;
 }
