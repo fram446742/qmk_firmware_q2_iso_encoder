@@ -39,7 +39,6 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 #define LAYER_VIS_TIMEOUT_MS  1500     ///< How long the overlay stays on (ms)
-#define LAYER_VIS_FADE_MS     300      ///< Optional fade-out duration (0 = instant off)
 
 // ── Colors per key category  {R, G, B} ─────────────────────────────────────
 #define LV_COLOR_BYPASS    {5, 5, 5}       ///< transparent keys (_______) — dim grey
@@ -179,7 +178,6 @@ typedef struct __attribute__((packed)) {
 //  base_type=0 → base_id = KC_xxx keycode (follows the keycode label)
 
 #define TAP_DEFAULTS \
-    {.base_id=KC_BSPC, .tap_kc=KC_BSPC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=KC_DEL},      \
     {.base_id=QK_GESC, .tap_kc=QK_GESC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(QK_GESC)}, \
     {.base_id=KC_E,    .tap_kc=KC_E,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_E)},    \
     {.base_id=KC_1,    .tap_kc=KC_1,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_1)},    \
@@ -194,7 +192,7 @@ typedef struct __attribute__((packed)) {
     {.base_id=KC_0,    .tap_kc=KC_0,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_0)},    \
     {.base_id=KC_MINS, .tap_kc=KC_MINS, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_MINS)}, \
     {.base_id=KC_EQL,  .tap_kc=KC_EQL,  .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_EQL)},   \
-    {.base_id=KC_BSPC, .tap_kc=KC_BSPC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_BSPC)}, \
+    {.base_id=KC_BSPC, .tap_kc=KC_BSPC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=KC_DEL}, \
     {0}  /* sentinel — all fields zero, keep last */
 
 // Combo and leader defaults start empty (sentinel-only entries → zero count).
@@ -245,14 +243,7 @@ enum layers {
 // ═════════════════════════════════════════════════════════════════════════════
 
 enum feature_keycodes {
-    KC_AUTOSHIFT_TOGGLE = NEW_SAFE_RANGE,
-    KC_TAP_DANCE_TOGGLE,
-    KC_CAPS_WORD_TOGGLE,
-    KC_REPEAT_KEY_TOGGLE,
-    KC_DYN_MACRO_TOGGLE,
-    KC_LEADER_TOGGLE,
-    KC_NKRO_TOGGLE,
-    KC_FEAT_OVERVIEW,
+    KC_FEAT_OVERVIEW = NEW_SAFE_RANGE,
 };
 
 enum combo_events {
@@ -338,10 +329,6 @@ enum combo_events {
 
 #define IND_NKRO        50
 // #define IND_NKRO       POS_IDX_KC_N
-
-// Layer indicator: layer N → key N+1 (LED 1-9), layer 0 → key 0 (LED 10)
-#define IND_LAYER_BASE  1
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows

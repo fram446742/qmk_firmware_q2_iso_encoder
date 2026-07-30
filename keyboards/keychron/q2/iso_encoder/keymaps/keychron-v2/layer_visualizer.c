@@ -87,7 +87,7 @@ static key_category_t categorize(uint16_t kc) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Color lookup table
+// Color lookup table (PROGMEM for flash savings)
 // ═════════════════════════════════════════════════════════════════════════════
 
 static const uint8_t PROGMEM cat_colors[12][3] = {
@@ -105,26 +105,38 @@ static const uint8_t PROGMEM cat_colors[12][3] = {
     [CAT_LAYER]     = LV_COLOR_LAYER,
 };
 
-static void set_led(uint8_t led, key_category_t cat) {
-    uint8_t r = pgm_read_byte(&cat_colors[cat][0]);
-    uint8_t g = pgm_read_byte(&cat_colors[cat][1]);
-    uint8_t b = pgm_read_byte(&cat_colors[cat][2]);
-    rgb_matrix_set_color(led, r, g, b);
-}
+// ── Per-LED color cache ─────────────────────────────────────────────────
+// Computed once per vis transition (layer change or MO hold/release),
+// then applied every RGB frame without recomputing keycode lookups.
+static uint8_t  vis_cache[RGB_MATRIX_LED_COUNT][3];
+static bool     vis_cache_valid = false;
 
-static void draw_layer(uint8_t layer) {
+static void build_cache(uint8_t layer) {
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
         uint16_t mtx  = led_to_mtx[led];
         uint8_t  row  = (mtx >> 8) & 0xFF;
         uint8_t  col  = mtx & 0xFF;
         uint16_t kc   = keycode_at_keymap_location_raw(layer, row, col);
-        set_led(led, categorize(kc));
+        key_category_t cat = categorize(kc);
+        vis_cache[led][0] = pgm_read_byte(&cat_colors[cat][0]);
+        vis_cache[led][1] = pgm_read_byte(&cat_colors[cat][1]);
+        vis_cache[led][2] = pgm_read_byte(&cat_colors[cat][2]);
+    }
+    vis_cache_valid = true;
+}
+
+static void apply_cache(void) {
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        rgb_matrix_set_color(led,
+                             vis_cache[led][0],
+                             vis_cache[led][1],
+                             vis_cache[led][2]);
     }
 }
 
-
 // ═════════════════════════════════════════════════════════════════════════════
 // State
+// ═════════════════════════════════════════════════════════════════════════════
 // ═════════════════════════════════════════════════════════════════════════════
 
 static bool   perm_active   = false;
@@ -174,6 +186,7 @@ void layer_visualizer_trigger(void) {
     if (moment_active) return;
 
     vis_layer   = get_highest_layer(layer_state);
+    vis_cache_valid = false;
     perm_active = true;
     perm_start  = timer_read32();
 }
@@ -184,11 +197,13 @@ void layer_visualizer_momentary_start(uint8_t target_layer) {
 
     moment_active = true;
     vis_layer     = target_layer;
+    vis_cache_valid = false;
     perm_active   = false;
 }
 
 void layer_visualizer_momentary_stop(void) {
     moment_active = false;
+    vis_cache_valid = false;  // next draw will rebuild for the permanent layer
     // Mark the upcoming layer-state change (triggered by QMK processing
     // the MO release) as something to ignore.
     mo_release_pending = true;
@@ -229,8 +244,13 @@ void layer_vis_toggle(void) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Drawing
+// Drawing  (uses cached per-LED colors)
 // ═════════════════════════════════════════════════════════════════════════════
+
+static void draw_layer(uint8_t layer) {
+    if (!vis_cache_valid) build_cache(layer);
+    apply_cache();
+}
 
 void layer_visualizer_draw(void) {
     draw_layer(vis_layer);

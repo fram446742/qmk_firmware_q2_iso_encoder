@@ -15,5 +15,13 @@ bool feature_overview_is_active(void);
 void feature_overview_cancel(void);
 void feature_overview_reset_timer(void);
 
+/// Map a layer number to a physical LED index.
+/// Layer 0 → LED 10, layers 1-9 → LED N.  Returns 255 for invalid layers.
+uint8_t layer_to_led(uint8_t layer);
+
+/// Compute the current display layer and map to LED.
+/// Returns the LED index for the active (non-default) layer indicator.
+uint8_t indicator_led_for_layer(void);
+
 void indicator_draw(void);
 void indicator_task(void);
