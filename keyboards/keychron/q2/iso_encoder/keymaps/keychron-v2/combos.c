@@ -32,7 +32,7 @@
 // Display (the only active combo)
 // ═════════════════════════════════════════════════════════════════════════════
 
-const uint16_t PROGMEM cb_feat_overview[]   = {KC_O, KC_P, COMBO_END};
+const uint16_t PROGMEM cb_feat_overview[]   = {KC_O, KC_LBRC, COMBO_END};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Combo table

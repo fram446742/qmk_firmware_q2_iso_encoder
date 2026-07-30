@@ -68,13 +68,15 @@ static void feature_apply_all(void) {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+#define DEFAULT_FEATURE_FLAGS (FEATURE_CAPS_WORD | FEATURE_REPEAT_KEY)
+
 void features_init(void) {
     // Load persisted flags
     g_feature_flags = eeprom_read_byte((const uint8_t *)FEATURES_EEPROM_ADDR);
 
-    // If EEPROM was erased (all 0xFF), treat as default config
-    if (g_feature_flags == 0xFF) {
-        g_feature_flags = 0;  // all features off by default
+    // First boot: EEPROM is erased (0xFF) or zeros — set defaults
+    if (g_feature_flags == 0xFF || g_feature_flags == 0) {
+        g_feature_flags = DEFAULT_FEATURE_FLAGS;
         features_save();
         features_load_defaults();
         features_save_config();
@@ -131,8 +133,9 @@ eeprom_leader_t eeprom_leaders[MAX_LEADERS];
 uint8_t         eeprom_leader_count = 0;
 
 void features_load_config(void) {
-    eeprom_tap_count   = eeprom_read_byte((const uint8_t *)EEP_TAP_BASE);
-    if (eeprom_tap_count == 0xFF || eeprom_tap_count > MAX_TAP_OVERRIDES) {
+    eeprom_tap_count = eeprom_read_byte((const uint8_t *)EEP_TAP_BASE);
+    // Safety: treat uninitialized (0xFF), invalid, or zero as "needs defaults"
+    if (eeprom_tap_count == 0xFF || eeprom_tap_count == 0 || eeprom_tap_count > MAX_TAP_OVERRIDES) {
         features_load_defaults();
         features_save_config();
         return;
@@ -163,17 +166,17 @@ void features_load_defaults(void) {
     eeprom_tap_count = 5;
     eeprom_tap[0] = (eeprom_tap_t){.base_kc=KC_BSPC,.tap_kc=KC_BSPC,.dbl_type=TD_DBL_KEYCODE,.dbl_val=KC_DEL};
     eeprom_tap[1] = (eeprom_tap_t){.base_kc=KC_ESC, .tap_kc=KC_ESC, .dbl_type=TD_DBL_KEYCODE,.dbl_val=CW_TOGG};
-    eeprom_tap[2] = (eeprom_tap_t){.base_kc=KC_E,   .tap_kc=KC_E,   .dbl_type=TD_DBL_UNICODE_STR};
-    // Copy UTF-8 bytes of "\u20AC" into dbl_val/dbl_extra
-    eeprom_tap[2].dbl_val    = 0x82E2;  // UTF-8 bytes of €: E2 82
-    eeprom_tap[2].dbl_extra  = 0x00AC;  // AC 00 (3rd byte + null)
+    // € (U+20AC) — stored as raw codepoint for register_unicode()
+    // Requires OS Unicode input: Win: Alt+`+20AC, Linux: Ctrl+Shift+U+20AC
+    eeprom_tap[2] = (eeprom_tap_t){.base_kc=KC_E, .tap_kc=KC_E, .dbl_type=TD_DBL_UNICODE_CP,
+                                    .dbl_val=0x20AC, .dbl_extra=0};
     eeprom_tap[3] = (eeprom_tap_t){.base_kc=KC_2,   .tap_kc=KC_2,   .dbl_type=TD_DBL_UNICODE_STR,.dbl_val='@'};
-    eeprom_tap[4] = (eeprom_tap_t){.base_kc=KC_GRV, .tap_kc=KC_GRV, .dbl_type=TD_DBL_UNICODE_STR,.dbl_val='~'};
+    eeprom_tap[4] = (eeprom_tap_t){.base_kc=KC_4, .tap_kc=KC_4, .dbl_type=TD_DBL_UNICODE_STR,.dbl_val='~'};
 
     // Default combos (only overview)
     eeprom_combo_count = 1;
     eeprom_combos[0].keys[0] = KC_O;
-    eeprom_combos[0].keys[1] = KC_P;
+    eeprom_combos[0].keys[1] = KC_LBRC;
     eeprom_combos[0].output  = KC_FEAT_OVERVIEW_VAL;
 
     // Default leader sequences
