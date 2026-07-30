@@ -264,7 +264,7 @@ enum combo_events {
 // COMBO DEFINITIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
-#define COMBO_FEAT_OVERVIEW_KEYS    {KC_O, KC_P, COMBO_END}
+#define COMBO_FEAT_OVERVIEW_KEYS    {POS_KC_O, POS_KC_LBRC, COMBO_END}
 #define COMBO_FEAT_OVERVIEW_ACTION   KC_FEAT_OVERVIEW
 
 
