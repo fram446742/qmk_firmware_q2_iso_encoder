@@ -17,4 +17,11 @@ void layer_visualizer_momentary_stop(void);
 bool layer_visualizer_is_active(void);
 void layer_visualizer_task(void);
 void layer_visualizer_draw(void);
+/// Call once after keyboard init (after features_init). Records default layer.
+void layer_visualizer_init(void);
+
+/// Call from matrix_scan_user after the initial default-layer sync.
+/// Enables triggers (the initial sync itself is suppressed).
+void layer_visualizer_sync_complete(void);
+
 void layer_vis_toggle(void);

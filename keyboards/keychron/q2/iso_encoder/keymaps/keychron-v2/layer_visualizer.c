@@ -132,6 +132,13 @@ static uint32_t perm_start  = 0;
 static bool   moment_active = false;
 static uint8_t vis_layer    = 0;
 
+// Suppress visualization during init.  boot_done is set by init(), but
+// the initial layer_move() in matrix_scan_user's default-layer sync also
+// fires a trigger.  boot_done stays false until AFTER that sync completes.
+// init() records the initial default layer so we can detect the sync.
+static bool   boot_done = false;
+static uint8_t boot_default_layer = 0;
+
 // When an MO key is released, QMK processes the layer change AFTER
 // process_record_user returns.  This flag tells the next trigger() call
 // that it's caused by an MO release, so it should NOT start the timer.
@@ -144,6 +151,17 @@ static bool mo_release_pending = false;
 
 void layer_visualizer_trigger(void) {
     if (!feature_layer_vis()) return;
+
+    // Suppress triggers during boot.  The first trigger is the initial
+    // default-layer sync which we skip (boot_done still false here).
+    if (!boot_done) {
+        // Pop the guard: if this layer change is NOT the initial sync
+        // (i.e. someone changes layer before matrix_scan runs), allow it.
+        if (get_highest_layer(layer_state) != boot_default_layer) {
+            boot_done = true;
+        }
+        return;
+    }
 
     // Suppress trigger if it's the result of an MO key release.
     // The flag is set by momentary_stop() and consumed here.
@@ -178,6 +196,20 @@ void layer_visualizer_momentary_stop(void) {
 
 bool layer_visualizer_is_active(void) {
     return perm_active || moment_active;
+}
+
+// Called once after keyboard init + default-layer sync.
+// Before this, all layer_state_set_user calls are ignored.
+// We detect the initial sync by remembering the default layer.
+void layer_visualizer_init(void) {
+    boot_default_layer = get_highest_layer(default_layer_state);
+}
+
+// Called by matrix_scan_user after the initial default-layer sync.
+// This allows the FIRST layer trigger (which happens during that sync)
+// to be suppressed — we don't show visualization for boot setup.
+void layer_visualizer_sync_complete(void) {
+    boot_done = true;
 }
 
 void layer_visualizer_task(void) {
