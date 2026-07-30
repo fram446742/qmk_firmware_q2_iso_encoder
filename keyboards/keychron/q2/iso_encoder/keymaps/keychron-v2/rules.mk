@@ -10,8 +10,6 @@ CAPS_WORD_ENABLE = yes
 DYNAMIC_MACRO_ENABLE = yes
 
 # Key overrides (e.g. shift+[ = {)
-KEY_OVERRIDE_ENABLE = yes
-
 # Repeat / Alt-Repeat keys
 REPEAT_KEY_ENABLE = yes
 

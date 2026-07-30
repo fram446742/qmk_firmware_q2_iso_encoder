@@ -7,10 +7,9 @@
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Feature bit flags — stored as uint8_t in EEPROM at address 8100.
-// Bitwise operations only: AND for test, XOR for toggle, OR/AND-NOT for set.
 // ═════════════════════════════════════════════════════════════════════════════
 
-#define FEATURE_TAP_DANCE   (1 << 0)  // Tap-dance (TD) keycode processing
+#define FEATURE_TAP_DANCE   (1 << 0)  // Tap-dance keycode processing
 #define FEATURE_AUTO_SHIFT  (1 << 1)  // Auto-shift on/off
 #define FEATURE_CAPS_WORD   (1 << 2)  // Caps Word keycode processing
 #define FEATURE_REPEAT_KEY  (1 << 3)  // Repeat / Alt-Repeat keycode processing
@@ -18,41 +17,78 @@
 #define FEATURE_LEADER      (1 << 5)  // Leader key processing
 // bit 6-7 reserved
 
-// ── Current runtime state (from EEPROM) ────────────────────────────────────
+// Runtime flags
 extern uint8_t g_feature_flags;
 
-// ── API ─────────────────────────────────────────────────────────────────────
-void    features_init(void);               // Load from EEPROM, apply to HW
-void    features_save(void);               // Write to EEPROM
-
-// Test, toggle, set — all explicit bitwise ops on g_feature_flags
+// Feature flag API
+void    features_init(void);               // Load from EEPROM, apply
+void    features_save(void);               // Write flags to EEPROM
 bool    feature_has(uint8_t flag);
 void    feature_toggle(uint8_t flag);
 void    feature_set(uint8_t flag, bool on);
 
-// ── Convenience wrappers ────────────────────────────────────────────────────
-static inline bool    feature_tap_dance(void)           { return feature_has(FEATURE_TAP_DANCE); }
-static inline void    feature_toggle_tap_dance(void)    { feature_toggle(FEATURE_TAP_DANCE); }
-static inline bool    feature_auto_shift(void)          { return feature_has(FEATURE_AUTO_SHIFT); }
-static inline void    feature_toggle_auto_shift(void)   { feature_toggle(FEATURE_AUTO_SHIFT); }
-static inline bool    feature_caps_word(void)           { return feature_has(FEATURE_CAPS_WORD); }
-static inline void    feature_toggle_caps_word(void)    { feature_toggle(FEATURE_CAPS_WORD); }
-static inline bool    feature_repeat_key(void)          { return feature_has(FEATURE_REPEAT_KEY); }
-static inline void    feature_toggle_repeat_key(void)   { feature_toggle(FEATURE_REPEAT_KEY); }
-static inline bool    feature_dyn_macro(void)           { return feature_has(FEATURE_DYN_MACRO); }
-static inline void    feature_toggle_dyn_macro(void)    { feature_toggle(FEATURE_DYN_MACRO); }
-static inline bool    feature_leader(void)              { return feature_has(FEATURE_LEADER); }
-static inline void    feature_toggle_leader(void)       { feature_toggle(FEATURE_LEADER); }
+// Convenience wrappers (used by keymap.c and indicators.c)
+#define feature_tap_dance()      feature_has(FEATURE_TAP_DANCE)
+#define feature_auto_shift()     feature_has(FEATURE_AUTO_SHIFT)
+#define feature_caps_word()      feature_has(FEATURE_CAPS_WORD)
+#define feature_repeat_key()     feature_has(FEATURE_REPEAT_KEY)
+#define feature_dyn_macro()      feature_has(FEATURE_DYN_MACRO)
+#define feature_leader()         feature_has(FEATURE_LEADER)
+
+#define feature_toggle_tap_dance()      feature_toggle(FEATURE_TAP_DANCE)
+#define feature_toggle_auto_shift()     feature_toggle(FEATURE_AUTO_SHIFT)
+#define feature_toggle_caps_word()      feature_toggle(FEATURE_CAPS_WORD)
+#define feature_toggle_repeat_key()     feature_toggle(FEATURE_REPEAT_KEY)
+#define feature_toggle_dyn_macro()      feature_toggle(FEATURE_DYN_MACRO)
+#define feature_toggle_leader()         feature_toggle(FEATURE_LEADER)
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Tap-dance transparent override
+// ═════════════════════════════════════════════════════════════════════════════
+// Intercepts base keycodes and provides tap/double-tap behavior when
+// FEATURE_TAP_DANCE is enabled.  No TD() keycodes in the keymap.
+
+struct keyrecord_t;
+typedef struct keyrecord_t keyrecord_t;
+
+// Returns false if the keypress was consumed by tap overrides.
+// Call from process_record_user when feature_tap_dance() is true.
+bool features_tap_process(uint16_t keycode, keyrecord_t *record);
+
+// Periodic timeout check — fires single-tap when pending + TAP_TERM expired.
+// Call from matrix_scan_user.
+void features_tap_task(void);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // EEPROM-backed config (tap overrides, combos, leader sequences)
 // ═════════════════════════════════════════════════════════════════════════════
-// Layout: 8100 flags(1B), 8101 count(1B), 8102+ entries, see features.c
+//
+// These constants are shared between C (features.c, keymap.c) and the Python
+// tool (qmk_config_tool.py).  The Python tool reads this header at import time
+// to stay in sync.
 
+// HID protocol value IDs for via_custom_value_command_kb
+// (hardware/firmware → tool communication)
+#define VALUE_FLAGS        0x01  // get/set g_feature_flags
+#define VALUE_TAP_COUNT    0x02  // get/set tap override count
+#define VALUE_TAP_ENTRY    0x03  // get/set one tap override entry
+#define VALUE_COMBO_COUNT  0x04  // get/set combo count
+#define VALUE_COMBO_ENTRY  0x05  // get/set one combo entry
+#define VALUE_LEADER_COUNT 0x06  // get/set leader count
+#define VALUE_LEADER_ENTRY 0x07  // get/set one leader entry
+
+// EEPROM addresses (logical byte offsets past VIA macro area)
+#define EEP_FEATURES       8100  // feature flags (1 B)
+#define EEP_TAP_BASE       8101  // tap: count(1B) + entries (200B = 20×10B)
+#define EEP_COMBO_BASE     8302  // combos: count(1B) + entries (64B = 8×8B)
+#define EEP_LEADER_BASE    8367  // leaders: count(1B) + entries (96B = 16×6B)
+
+// Tap dance double-tap action types
 typedef enum {
-    TD_DBL_KEYCODE     = 0,
-    TD_DBL_UNICODE_STR = 1,
-    TD_DBL_UNICODE_CP  = 2,
+    TD_DBL_KEYCODE      = 0,  // single keycode (or modded, e.g. S(KC_2))
+    TD_DBL_UNICODE_STR  = 1,  // Unicode string via send_unicode_string()
+    TD_DBL_UNICODE_CP   = 2,  // Unicode codepoint via register_unicode()
+    TD_DBL_SEND_STRING  = 3,  // ASCII string (≤4 chars) via send_string()
 } td_dbl_type_t;
 
 typedef struct __attribute__((packed)) {
