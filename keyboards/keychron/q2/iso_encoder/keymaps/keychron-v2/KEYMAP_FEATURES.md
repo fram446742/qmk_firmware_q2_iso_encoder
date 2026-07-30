@@ -162,7 +162,6 @@ white=ON, red=OFF.
 | LED | Key | Meaning |
 |---|---|---|
 | 10/1-8 | Number row | Active layer (highest in `layer_state`) |
-| 28 | Caps Lock | Hardware Caps Lock state |
 | 29 | A | Auto-Shift ON |
 | 30 | S | Auto-Correct ON |
 | 19 | T | Tap Dance ON |
@@ -172,8 +171,7 @@ white=ON, red=OFF.
 | 37 | L | Leader Key ON |
 | 50 | N | NKRO ON |
 
-All indicator LEDs: white=active, red=inactive. Caps Lock uses hardware state
-(`host_keyboard_led_state().caps_lock`), not a feature flag.
+All indicator LEDs: white=active, red=inactive.
 
 ## Feature flags
 

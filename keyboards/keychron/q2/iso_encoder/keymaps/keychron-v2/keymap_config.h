@@ -343,10 +343,6 @@ enum combo_events {
 //   50    N     NKRO ON
 
 // ── Numeric LED indices (direct, no dependencies):
-#define IND_CAPS_LOCK   28
-// ── Symbolic from key_positions.h (self-documenting, stays in sync):
-// #define IND_CAPS_LOCK  POS_IDX_KC_CAPS
-
 #define IND_AUTO_SHIFT  29
 // #define IND_AUTO_SHIFT POS_IDX_KC_A
 

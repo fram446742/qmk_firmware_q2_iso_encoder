@@ -85,7 +85,6 @@ void indicator_draw(void) {
     // ── Feature indicators (active=white, inactive=red) ────────────────
     typedef struct { uint8_t led; bool active; } ind_t;
     ind_t list[] = {
-        { IND_CAPS_LOCK,   host_keyboard_led_state().caps_lock         },
         { IND_AUTO_SHIFT,  feature_auto_shift()                       },
         { IND_TAP_DANCE,   feature_tap_dance()                        },
         { IND_CAPS_WORD,   feature_caps_word()                        },
