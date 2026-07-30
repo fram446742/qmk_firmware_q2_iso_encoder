@@ -17,15 +17,23 @@ static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Helpers
+// Layer ↔ LED mapping
 // ═════════════════════════════════════════════════════════════════════════════
 
 // Layer 0 → key "0" (LED 10), layer N → key N (LED N, 1-9)
-static uint8_t layer_to_led(uint8_t layer) {
+uint8_t layer_to_led(uint8_t layer) {
     if (layer == 0) return 10;
     if (layer >= 1 && layer <= 9) return layer;
     return 255;
 }
+
+uint8_t indicator_led_for_layer(void) {
+    uint8_t base    = get_highest_layer(default_layer_state);
+    uint8_t highest = get_highest_layer(layer_state);
+    uint8_t display = (highest != base) ? highest : base;
+    return layer_to_led(display);
+}
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -70,10 +78,7 @@ void indicator_draw(void) {
     rgb_matrix_set_color_all(0, 0, 0);
 
     // ── Active-layer indicator ──────────────────────────────────────────
-    uint8_t base    = get_highest_layer(default_layer_state);
-    uint8_t highest = get_highest_layer(layer_state);
-    uint8_t display = (highest != base) ? highest : base;
-    uint8_t led     = layer_to_led(display);
+    uint8_t led = indicator_led_for_layer();
     if (led < RGB_MATRIX_LED_COUNT)
         rgb_matrix_set_color(led, 255, 255, 255);
 

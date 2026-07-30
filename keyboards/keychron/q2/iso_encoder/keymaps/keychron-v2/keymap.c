@@ -324,14 +324,6 @@ void matrix_scan_user(void) {
 }
 
 #if defined(RGB_MATRIX_ENABLE)
-// Helper: layer number → LED index (mirrors indicators.c logic)
-static uint8_t overview_layer_led(void) {
-    uint8_t base    = get_highest_layer(default_layer_state);
-    uint8_t highest = get_highest_layer(layer_state);
-    uint8_t display = (highest != base) ? highest : base;
-    return (display == 0) ? 10 : display;  // layer 0 → LED 10, layer N → LED N
-}
-
 bool rgb_matrix_indicators_user(void) {
     indicator_draw();
 
@@ -340,7 +332,7 @@ bool rgb_matrix_indicators_user(void) {
         // overlay the layer-number LED in white on top.
         if (layer_visualizer_is_active()) {
             layer_visualizer_draw();
-            uint8_t led = overview_layer_led();
+            uint8_t led = indicator_led_for_layer();
             if (led < RGB_MATRIX_LED_COUNT)
                 rgb_matrix_set_color(led, 255, 255, 255);
         }

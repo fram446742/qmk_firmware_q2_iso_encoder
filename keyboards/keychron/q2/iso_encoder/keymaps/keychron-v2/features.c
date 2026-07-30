@@ -129,8 +129,11 @@ bool features_tap_process(uint16_t keycode, keyrecord_t *record) {
             tap_timer       = now;
             return false;
         } else {
-            if (tap_pending_idx == i) return false;
-            return true;
+            // Always consume the release of a matched key, even if not
+            // currently pending (the press was already consumed above).
+            // Letting the release through could unregister a keycode that
+            // was never sent to the host.
+            return false;
         }
     }
 
@@ -157,24 +160,17 @@ void features_tap_task(void) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 static void feature_apply_flag(uint8_t flag) {
-    bool enabled = feature_has(flag);
+    // Most feature flags gate runtime behavior in process_record_user()
+    // via the feature_*() convenience wrappers. Only auto-shift has a
+    // direct enable/disable API that needs immediate application.
+    (void)flag;
 
-    switch (flag) {
-        case FEATURE_TAP_DANCE:
-        case FEATURE_CAPS_WORD:
-        case FEATURE_REPEAT_KEY:
-        case FEATURE_DYN_MACRO:
-        case FEATURE_LEADER:
-            break;
 #ifdef AUTO_SHIFT_ENABLE
-        case FEATURE_AUTO_SHIFT:
-            if (enabled) autoshift_enable();
-            else         autoshift_disable();
-            break;
-#endif
-        default:
-            break;
+    if (flag == FEATURE_AUTO_SHIFT) {
+        if (feature_auto_shift()) autoshift_enable();
+        else                      autoshift_disable();
     }
+#endif
 }
 
 void feature_apply_all(void) {
@@ -233,8 +229,7 @@ void feature_set(uint8_t flag, bool on) {
 
 void features_load_config(void) {
     eeprom_tap_count = eeprom_read_byte((const uint8_t *)EEP_TAP_BASE);
-    if (eeprom_tap_count == 0xFF || eeprom_tap_count == 0
-        || eeprom_tap_count > MAX_TAP_OVERRIDES) {
+    if (eeprom_tap_count == 0xFF || eeprom_tap_count > MAX_TAP_OVERRIDES) {
         features_load_defaults();
         features_save_config();
         return;
