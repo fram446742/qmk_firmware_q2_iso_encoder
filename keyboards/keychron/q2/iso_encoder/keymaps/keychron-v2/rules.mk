@@ -34,6 +34,7 @@ LTO_ENABLE = yes
 # Custom modules for this keymap (feature toggles, indicators)
 SRC += features.c
 SRC += indicators.c
+SRC += layer_visualizer.c
 
 # Auto-generate autocorrect_data.h + key_positions.h at build time
 DUMMY := $(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)

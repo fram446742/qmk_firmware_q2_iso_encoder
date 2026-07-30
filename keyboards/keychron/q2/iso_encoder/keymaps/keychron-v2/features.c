@@ -184,6 +184,7 @@ void feature_apply_all(void) {
     feature_apply_flag(FEATURE_REPEAT_KEY);
     feature_apply_flag(FEATURE_DYN_MACRO);
     feature_apply_flag(FEATURE_LEADER);
+    feature_apply_flag(FEATURE_LAYER_VIS);
 }
 
 void features_init(void) {

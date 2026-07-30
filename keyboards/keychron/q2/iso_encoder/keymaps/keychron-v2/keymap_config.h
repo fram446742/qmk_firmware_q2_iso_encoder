@@ -35,6 +35,28 @@
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+// LAYER VISUALIZATION  —  show key categories in color for N ms after layer change
+// ═════════════════════════════════════════════════════════════════════════════
+
+#define LAYER_VIS_TIMEOUT_MS  1500     ///< How long the overlay stays on (ms)
+#define LAYER_VIS_FADE_MS     300      ///< Optional fade-out duration (0 = instant off)
+
+// ── Colors per key category  {R, G, B} ─────────────────────────────────────
+#define LV_COLOR_BYPASS    {5, 5, 5}       ///< transparent keys (_______) — dim grey
+#define LV_COLOR_BLANK     {0, 0, 0}       ///< KC_NO — off
+#define LV_COLOR_MODIFIER  {255, 140, 0}   ///< Ctrl, Shift, Alt, Win — amber
+#define LV_COLOR_MAC_EXTRA {0, 190, 255}   ///< Mac Option/Cmd — sky blue
+#define LV_COLOR_FUNCTION  {100, 220, 80}  ///< F1-F24 — lime green
+#define LV_COLOR_BASIC     {0, 170, 0}     ///< alpha, numbers, navigation — green
+#define LV_COLOR_MEDIA     {0, 90, 230}    ///< media keys — medium blue
+#define LV_COLOR_MACRO     {255, 0, 200}   ///< macro keys — magenta
+#define LV_COLOR_SPECIAL   {200, 100, 0}   ///< Keychron custom (KC_TASK, etc.) — dark orange
+#define LV_COLOR_LIGHT     {200, 200, 0}   ///< lighting/RGB keys — yellow
+#define LV_COLOR_CUSTOM    {120, 0, 255}   ///< user custom keycodes — purple
+#define LV_COLOR_LAYER     {255, 0, 0}     ///< layer management — red
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 // FEATURE BIT FLAGS  (stored as uint8_t in EEPROM at address EEP_FEATURES)
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -44,10 +66,11 @@
 #define FEATURE_REPEAT_KEY  (1 << 3)  ///< Repeat / Alt-Repeat processing
 #define FEATURE_DYN_MACRO   (1 << 4)  ///< Dynamic Macro processing
 #define FEATURE_LEADER      (1 << 5)  ///< Leader key sequences
-// bits 6-7 reserved
+#define FEATURE_LAYER_VIS   (1 << 6)  ///< Layer visualization (show key categories on layer change)
+// bit 7 reserved
 
-/// Default feature flags at first boot  (Caps Word + Repeat ON, others OFF)
-#define DEFAULT_FEATURE_FLAGS  (FEATURE_CAPS_WORD | FEATURE_REPEAT_KEY)
+/// Default feature flags at first boot  (Caps Word + Repeat + Layer Vis ON, others OFF)
+#define DEFAULT_FEATURE_FLAGS  (FEATURE_CAPS_WORD | FEATURE_REPEAT_KEY | FEATURE_LAYER_VIS)
 
 
 // ═════════════════════════════════════════════════════════════════════════════

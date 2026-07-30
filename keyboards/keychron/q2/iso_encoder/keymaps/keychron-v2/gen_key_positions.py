@@ -82,6 +82,24 @@ for i, (arg, entry) in enumerate(zip(args, layout)):
 
 lines.append(f'// Total: {len(seen)} keys')
 
+# ── LED → matrix-position lookup array (for layer visualization) ─────────
+# Index by LED index from g_snled27351_leds[], get PACK_MTX(row,col).
+# Keys without an RGB LED (e.g. rotary encoder) are excluded from the array.
+lines.append('')
+lines.append('// ── LED-index → matrix-position lookup ──────────────────────────')
+lines.append('// Keys without an RGB LED (e.g. rotary encoder) are excluded.')
+
+# Identify layout entries that have no RGB LED (encoder key).
+no_led = {(0, 14)}  # (row,col) sets with no RGB LED on this keyboard
+led_layout = [e for e in layout if tuple(e['matrix']) not in no_led]
+
+lines.append(f'static const uint16_t PROGMEM led_to_mtx[{len(led_layout)}] = {{')
+for entry in led_layout:
+    row, col = entry['matrix']
+    lines.append(f'    PACK_MTX({row}, {col}),')
+lines.append('};')
+lines.append('')
+
 # ── Write output ───────────────────────────────────────────────────────────
 out_path = os.path.join(KEYMAP_DIR, 'key_positions.h')
 with open(out_path, 'w') as f:
