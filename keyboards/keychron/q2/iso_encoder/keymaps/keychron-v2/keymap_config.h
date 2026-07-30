@@ -21,6 +21,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Auto-generated — matrix positions (POS_KC_xxx) and LED indices (POS_IDX_xxx)
+// from keyboard.json + MAC_BASE layer.  Regenerated every build.
+#include "key_positions.h"
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TIMINGS (milliseconds)
@@ -153,7 +157,7 @@ typedef struct __attribute__((packed)) {
 
 #define TAP_DEFAULTS \
     {.base_id=KC_BSPC, .tap_kc=KC_BSPC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=KC_DEL},      \
-    {.base_id=KC_GESC, .tap_kc=QK_GESC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(QK_GESC)}, \
+    {.base_id=QK_GESC, .tap_kc=QK_GESC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(QK_GESC)}, \
     {.base_id=KC_E,    .tap_kc=KC_E,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_E)},    \
     {.base_id=KC_1,    .tap_kc=KC_1,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_1)},    \
     {.base_id=KC_2,    .tap_kc=KC_2,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_2)},    \
@@ -237,7 +241,7 @@ enum combo_events {
 // COMBO DEFINITIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
-#define COMBO_FEAT_OVERVIEW_KEYS    {POS_KC_O, POS_KC_LBRC, COMBO_END}
+#define COMBO_FEAT_OVERVIEW_KEYS    {KC_O, KC_P, COMBO_END}
 #define COMBO_FEAT_OVERVIEW_ACTION   KC_FEAT_OVERVIEW
 
 
@@ -283,15 +287,34 @@ enum combo_events {
 //   37    L     Leader Key ON
 //   50    N     NKRO ON
 
-#define IND_CAPS_LOCK   POS_KC_CAPS
-#define IND_AUTO_SHIFT  POS_KC_A
-#define IND_TAP_DANCE   POS_KC_T
-#define IND_CAPS_WORD   POS_KC_C
-#define IND_REPEAT_KEY  POS_KC_R
-#define IND_DYN_MACRO   POS_KC_D
-#define IND_LEADER      POS_KC_L
-#define IND_AUTOCORRECT POS_KC_S
-#define IND_NKRO        POS_KC_N
+// ── Numeric LED indices (direct, no dependencies):
+#define IND_CAPS_LOCK   28
+// ── Symbolic from key_positions.h (self-documenting, stays in sync):
+// #define IND_CAPS_LOCK  POS_IDX_KC_CAPS
+
+#define IND_AUTO_SHIFT  29
+// #define IND_AUTO_SHIFT POS_IDX_KC_A
+
+#define IND_TAP_DANCE   19
+// #define IND_TAP_DANCE  POS_IDX_KC_T
+
+#define IND_CAPS_WORD   47
+// #define IND_CAPS_WORD  POS_IDX_KC_C
+
+#define IND_REPEAT_KEY  18
+// #define IND_REPEAT_KEY POS_IDX_KC_R
+
+#define IND_DYN_MACRO   31
+// #define IND_DYN_MACRO  POS_IDX_KC_D
+
+#define IND_LEADER      37
+// #define IND_LEADER     POS_IDX_KC_L
+
+#define IND_AUTOCORRECT 30
+// #define IND_AUTOCORRECT POS_IDX_KC_S
+
+#define IND_NKRO        50
+// #define IND_NKRO       POS_IDX_KC_N
 
 // Layer indicator: layer N → key N+1 (LED 1-9), layer 0 → key 0 (LED 10)
 #define IND_LAYER_BASE  1
