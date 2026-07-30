@@ -4,7 +4,7 @@
 
 | What | How |
 |---|---|
-| **Feature overview** | `O + P` — enter overview mode (10s timeout) |
+| **Feature overview** | `O + [` — enter overview mode (10s timeout). Position-based: works on any layer. |
 | **Toggle features** | Inside overview: tap key (A=AutoShift, T=TapDance, S=AutoCorrect, C=CapsWord, R=RepeatKey, D=DynMacro, L=Leader, N=NKRO) |
 | **Toggle layers** | Inside overview: tap number key (0-9) = `layer_move(N)`; same layer returns to default |
 | **Exit overview** | Tap any non-indicator key or wait 10s |
@@ -74,16 +74,75 @@ shortcuts (Alt+Tab, etc.).
 
 ## Combos
 
-| Combo | Keys | Action |
-|---|---|---|
-| `CB_FEAT_OVERVIEW` | `O + P` | Enter overview |
+| Combo | Keys | Action | System |
+|---|---|---|---|
+| `CB_FEAT_OVERVIEW` | `O + [` (keycode) | Enter overview | QMK native (key_combos[]) |
+| `CB_FEAT_OVERVIEW` | `O + [` (position) | Enter overview | Custom processor (pos_combos[]) |
 
-Combos are defined in `combos.c` (included from `keymap.c`).
+### Two combo systems
+
+The keymap runs **two independent combo processors**:
+
+#### 1. QMK-native (`key_combos[]` in `combos.c`)
+Processed by QMK's built-in `process_combo()`.  Keys in the `keys[]` array
+must be **`KC_xxx` keycodes** — QMK compares against the keycode value on
+the current layer.  If the keycode doesn't exist on the active layer (e.g.
+`KC_O` on a layer where that position is `KC_F10`), the combo won't fire.
+
+```c
+// combos.c — uses keycodes (KC_O, KC_LBRC, not POS_KC_O/POS_KC_LBRC)
+const uint16_t PROGMEM cb_feat_overview[] = {KC_O, KC_LBRC, COMBO_END};
+combo_t key_combos[] = {
+    [CB_FEAT_OVERVIEW] = COMBO(cb_feat_overview, KC_FEAT_OVERVIEW),
+};
+```
+
+#### 2. Position-based (`pos_combos[]` in `features.c`)
+Custom processor that matches by **physical matrix position** using the
+`POS_KC_xxx` macros from `key_positions.h`.  Works on **any layer** — it
+checks which physical key was pressed, not which keycode it sends.
+
+```c
+// keymap_config.h — uses matrix positions (POS_KC_O, POS_KC_LBRC)
+#define POS_COMBOS_DEFS \
+    POS_COMBO(2, BASE_IS_MATRIX, KC_FEAT_OVERVIEW, POS_KC_O, POS_KC_LBRC),
+```
+
+Position combos are processed **in `process_record_user()` before** QMK's
+native `process_combo()` runs.  If the positions match, the keys are
+consumed and don't reach QMK's combo system.  This means:
+- On layers where O+[ have the same physical keys (all base/FN layers):
+  position combo fires, QMK combo is irrelevant (keys already consumed)
+- On layers where those positions send different keycodes: position combo
+  still fires, QMK combo would also fire if it matched those keycodes
+  (but it won't, since the keys were already consumed)
+
+### Adding a new combo
+
+Both systems support up to 4 keys per combo.  To add a new position-based
+combo in `keymap_config.h`:
+
+```c
+// 1. Define combo via inline keys in the macro
+#define POS_COMBOS_DEFS \
+    POS_COMBO(2, BASE_IS_MATRIX, KC_FEAT_OVERVIEW, POS_KC_O, POS_KC_LBRC),    \
+    POS_COMBO(2, BASE_IS_MATRIX, KC_MYACTION,       POS_KC_A, POS_KC_S),
+```
+
+For keycode-based position combos (follows the keycode label, not the
+physical key), use `BASE_IS_KEYCODE` instead:
+
+```c
+#define POS_COMBOS_DEFS \
+    POS_COMBO(2, BASE_IS_KEYCODE, KC_FEAT_OVERVIEW, KC_O, KC_LBRC),  \
+    POS_COMBO(2, BASE_IS_MATRIX,  KC_MYACTION,      POS_KC_A, POS_KC_S),
+```
 
 ## Feature Overview (interactive mode)
 
-Press `O + P` to enter. LEDs go dark, indicator keys light up white=ON,
-red=OFF. Uses **physical key positions** (matrix row/col) — works on any layer.
+Press `O + [` simultaneously to enter.  Uses the **position-based combo**
+(see above) — works on any layer.  LEDs go dark, indicator keys light up
+white=ON, red=OFF.
 
 | Press | Action |
 |---|---|
@@ -203,7 +262,7 @@ connected.
 |---|---|---|
 | Tap dance doesn't respond | Feature flag OFF | Toggle T key in overview (O+P) |
 | € key sends Alt+Tab | OS Unicode input not configured | See "OS Unicode requirement" above |
-| Combos not firing | Keys pressed sequentially | Press O and P at the exact same time |
+| Combos not firing | Keys pressed sequentially, or using POS_KC_xxx in QMK-native combo | Press O and [ at the exact same time. QMK-native combos require KC_xxx keycodes (not POS_KC_xxx). The keymap's position-based combo (features_combo_process) uses POS_KC_xxx and works on any layer — that's the recommended path for layer-independent combos. |
 | Overview blank | RGB matrix mode disabled | Enable any effect in VIA's lighting tab |
 | Debug shows all zeros | EEPROM not initialized | Reflash, first-boot init runs when byte 8100 is 0xFF/0x00 |
 | Feature flag won't save | EEPROM address collision | Default 8100 is past VIA macro buffer; verify no other code uses it |
