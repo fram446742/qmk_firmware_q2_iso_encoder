@@ -100,6 +100,7 @@ KC = {  # subset of common QMK keycodes
     0x32:"KC_NUHS",0x2C:"KC_Z",0x1D:"KC_X",0x06:"KC_C",0x19:"KC_V",
     0x05:"KC_B",0x11:"KC_N",0x10:"KC_M",0x36:"KC_COMM",0x37:"KC_DOT",
     0x38:"KC_SLSH",0x7C:"KC_DEL",0x4A:"KC_HOME",
+    0x7C16:"QK_GESC",
     0xE1:"KC_LSFT",0xE5:"KC_RSFT",0xE0:"KC_LCTL",0xE4:"KC_RCTL",
     0xE2:"KC_LALT",0xE6:"KC_RALT",0xE3:"KC_LGUI",0xE7:"KC_RGUI",
     0x36:"KC_BSLS",0x52:"KC_UP",0x50:"KC_LEFT",0x51:"KC_DOWN",
@@ -163,7 +164,7 @@ _MOD_PREFIXES = {v: k for k, v in _MOD_WRAPPERS.items()}
 # ═══════════════════════════════════════════════════════════════════════════
 
 def pack_tap_entry(base_id, tap, dtype, dval, dextra=0, base_type=0):
-    return struct.pack('<HHBBHH', base_id, kc_val(tap), dtype, base_type, dval, dextra)
+    return struct.pack('<HHBBHH', kc_val(base_id), kc_val(tap), dtype, base_type, dval, dextra)
 
 def unpack_tap_entry(data):
     base_id,t,d,btype,v,x = struct.unpack_from('<HHBBHH', data)
@@ -196,23 +197,32 @@ def unpack_leader(data):
 
 class MockHIDDevice:
     def __init__(self):
-        self.features = 0x7F  # all bits on initially
+        self.features = 0x4C  # DEFAULT_FEATURE_FLAGS (CapsWord|RepeatKey|LayerVis)
         self.tap = []
         self.combos = []
         self.leaders = []
         self._init_defaults()
 
     def _init_defaults(self):
-        # Tap override defaults — must match features_load_defaults() in features.c.
-        # Combos and leaders have no EEPROM defaults (they're compile-time only,
-        # defined in combos.c and leader_end_user() in keymap.c).
-        # EEPROM combo/leader storage is for user customizations via this tool.
+        # Tap override defaults — must match TAP_DEFAULTS in keymap_config.h
+        # (loaded by features_load_defaults() in features.c).
+        # Combos and leaders have no firmware defaults (empty lists).
         self.tap = [
-            pack_tap_entry("KC_BSPC","KC_BSPC",DBL_KEYCODE,kc_val("KC_DEL")),
-            pack_tap_entry("KC_ESC","KC_ESC",DBL_KEYCODE,kc_val("CW_TOGG")),
+            pack_tap_entry("QK_GESC","QK_GESC",DBL_KEYCODE,kc_val("RALT(QK_GESC)")),
             pack_tap_entry("KC_E","KC_E",DBL_KEYCODE,kc_val("RALT(KC_E)")),
-            pack_tap_entry("KC_2","KC_2",DBL_KEYCODE,kc_val("LSFT(KC_2)")),
-            pack_tap_entry("KC_4","KC_4",DBL_KEYCODE,kc_val("LSFT(KC_GRV)")),
+            pack_tap_entry("KC_1","KC_1",DBL_KEYCODE,kc_val("RALT(KC_1)")),
+            pack_tap_entry("KC_2","KC_2",DBL_KEYCODE,kc_val("RALT(KC_2)")),
+            pack_tap_entry("KC_3","KC_3",DBL_KEYCODE,kc_val("RALT(KC_3)")),
+            pack_tap_entry("KC_4","KC_4",DBL_KEYCODE,kc_val("RALT(KC_4)")),
+            pack_tap_entry("KC_5","KC_5",DBL_KEYCODE,kc_val("RALT(KC_5)")),
+            pack_tap_entry("KC_6","KC_6",DBL_KEYCODE,kc_val("RALT(KC_6)")),
+            pack_tap_entry("KC_7","KC_7",DBL_KEYCODE,kc_val("RALT(KC_7)")),
+            pack_tap_entry("KC_8","KC_8",DBL_KEYCODE,kc_val("RALT(KC_8)")),
+            pack_tap_entry("KC_9","KC_9",DBL_KEYCODE,kc_val("RALT(KC_9)")),
+            pack_tap_entry("KC_0","KC_0",DBL_KEYCODE,kc_val("RALT(KC_0)")),
+            pack_tap_entry("KC_MINS","KC_MINS",DBL_KEYCODE,kc_val("RALT(KC_MINS)")),
+            pack_tap_entry("KC_EQL","KC_EQL",DBL_KEYCODE,kc_val("RALT(KC_EQL)")),
+            pack_tap_entry("KC_BSPC","KC_BSPC",DBL_KEYCODE,kc_val("KC_DEL")),
         ]
         self.combos = []
         self.leaders = []

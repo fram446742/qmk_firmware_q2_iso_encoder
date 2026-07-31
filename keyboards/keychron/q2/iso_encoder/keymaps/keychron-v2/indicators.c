@@ -76,6 +76,64 @@ void feature_overview_reset_timer(void) {
     }
 }
 
+// ── Overview key dispatch ────────────────────────────────────────────────
+// Called from process_record_user for every key press while overview is
+// open.  Positions use PACK_MTX (same packing as key_positions.h).
+// Feature keys and the number row keep the overview open (timer reset);
+// any other key exits it.
+
+void feature_overview_handle_key(keyrecord_t *record) {
+    uint16_t pos = PACK_MTX(record->event.key.row, record->event.key.col);
+
+    switch (pos) {
+        case PACK_MTX(2, 1):   // A — Auto-Shift
+            feature_toggle_auto_shift();
+            break;
+        case PACK_MTX(2, 2):   // S — Auto-Correct
+            autocorrect_toggle();
+            break;
+        case PACK_MTX(1, 5):   // T — Tap Dance
+            feature_toggle_tap_dance();
+            break;
+        case PACK_MTX(3, 4):   // C — Caps Word
+            feature_toggle_caps_word();
+            break;
+        case PACK_MTX(1, 4):   // R — Repeat Key
+            feature_toggle_repeat_key();
+            break;
+        case PACK_MTX(2, 3):   // D — Dynamic Macro
+            feature_toggle_dyn_macro();
+            break;
+        case PACK_MTX(2, 9):   // L — Leader Key
+            feature_toggle_leader();
+            break;
+        case PACK_MTX(3, 7):   // N — NKRO
+            clear_keyboard();
+            keymap_config.nkro = !keymap_config.nkro;
+            break;
+        case PACK_MTX(0, 10):  // 0 — layer 0 (or back to default)
+            LAYER_MOVE_OR_DEFAULT(0);
+            break;
+        case PACK_MTX(0, 1):   // 1 … 8 — layers 1-8
+        case PACK_MTX(0, 2):
+        case PACK_MTX(0, 3):
+        case PACK_MTX(0, 4):
+        case PACK_MTX(0, 5):
+        case PACK_MTX(0, 6):
+        case PACK_MTX(0, 7):
+        case PACK_MTX(0, 8):
+            LAYER_MOVE_OR_DEFAULT(pos & 0xFF);
+            break;
+        case PACK_MTX(0, 9):   // 9 — layer-visualization lock
+            layer_visualizer_lock_toggle();
+            break;
+        default:               // any other key — exit overview
+            feature_overview_cancel();
+            return;
+    }
+    feature_overview_reset_timer();
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Per-frame drawing
 // ═════════════════════════════════════════════════════════════════════════════
