@@ -66,6 +66,8 @@ void feature_overview_cancel(void) {
     overview_active = false;
     rgb_matrix_config.mode   = saved_rgb_mode;
     rgb_matrix_config.enable = saved_rgb_enabled;
+    // Restore a locked layer-visualization overlay that overview paused.
+    layer_visualizer_resume();
 }
 
 void feature_overview_reset_timer(void) {

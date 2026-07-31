@@ -155,7 +155,7 @@ white=ON, red=OFF.
 | **L** | Toggle Leader Key processing |
 | **N** | Toggle NKRO |
 | **0-8** | `layer_move(N)` — same layer returns to default |
-| **9** | Toggle **layer-visualization lock** (shows key categories permanently until next layer change) |
+*158|| **9** | Toggle **layer-visualization lock** (shows key categories permanently — updates on every layer change, survives overview, until toggled off again) |
 | **any other key** | Exit overview |
 
 ### Indicator LED map
@@ -174,9 +174,11 @@ white=ON, red=OFF.
 | 50 | N | NKRO ON |
 
 All indicator LEDs: white=active, red=inactive.  The layer-vis lock indicator
-shows white when the overview is shown in locked mode.  When locked, the
-color overlay stays on indefinitely until the next layer change — the timer
-never expires.
+shows white when the lock is ON.  The lock is toggled like any other feature
+inside overview (9 key) — while overview is open the overlay stays hidden;
+it appears only after exiting overview.  When locked, the color overlay
+stays on indefinitely — the timer never expires — updating with every
+layer change until the lock is toggled off.
 
 ## Feature flags
 

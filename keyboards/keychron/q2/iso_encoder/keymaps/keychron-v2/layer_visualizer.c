@@ -134,104 +134,131 @@ static void apply_cache(void) {
 // State
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// MO key detection uses a HYBRID approach:
-//   - PRESS: process_record_user detects IS_QK_MOMENTARY reliably because
-//            the MO layer hasn't been added when the keycode resolves.
-//   - RELEASE: layer_state_set_user detects which layer bit was removed.
-//            This works even if the resolved keycode changed due to another
-//            MO altering the layer stack.
+// Held MO keys are tracked by MATRIX POSITION (PACK_MTX(row, col)), not by
+// counting layer-bit removals:
+//   - PRESS:   process_record_user detects IS_QK_MOMENTARY reliably because
+//              the MO layer hasn't been added when the keycode resolves.
+//   - RELEASE: process_record_user matches the key's position against the
+//              held set on EVERY key release — no keycode resolution, so it
+//              works even if another MO altered the layer stack.
 //
-// A counter tracks how many MO keys are currently held.  The draw function
-// reads get_highest_layer(layer_state) live during moment mode, so it always
-// shows the correct layer regardless of which MO is held.
+// Layer bits can be added/removed without any MO press/release (VIA/Launcher
+// layer commands, the default-layer sync's layer_move(), TO/TG/DF) — a
+// bitmask-diff counter would desync on those, so the position set is the only
+// bookkeeping.  During moment mode the draw reads the LIVE layer_state every
+// frame — the same value state_notify.c reports to the Keychron Launcher — so
+// the overlay always matches the layer the keyboard is actually on.
+
+#define MAX_HELD_MO 8
 
 static bool     perm_active   = false;
 static uint32_t perm_start    = 0;
 static bool     moment_active = false;
 static uint8_t  vis_layer     = 0;  ///< cached layer for timer mode only
-static uint8_t  mo_counter    = 0;  ///< how many MO keys held
+static uint16_t mo_positions[MAX_HELD_MO];  ///< held MO keys, by matrix position
+static uint8_t  mo_count      = 0;  ///< how many MO keys held
 static bool     vis_locked    = false;  ///< lock: no auto-hide until next layer change
 
 // Suppress visualization during init.
-static bool   boot_done = false;
-static uint8_t boot_default_layer = 0;
+static bool boot_done = false;
 
 // Suppress timer restart on last-MO-release cleanup.
 static bool mo_release_pending = false;
+
+// Set on the first key press after boot.  Layer changes that arrive
+// before the user touches the keyboard (initial default-layer sync, USB
+// enumeration, Launcher/VIA connect commands) never start a display.
+static bool user_activity = false;
 
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Public API
 // ═════════════════════════════════════════════════════════════════════════════
 
-void layer_visualizer_momentary_start(void) {
+void layer_visualizer_momentary_start(uint16_t mtx_pos) {
     if (!feature_layer_vis()) return;
     if (feature_overview_is_active()) return;
 
-    if (mo_counter == 0) {
+    // Dedupe: a position can only be held once
+    for (uint8_t i = 0; i < mo_count; i++) {
+        if (mo_positions[i] == mtx_pos) return;
+    }
+
+    if (mo_count == 0) {
         // First MO press — enter moment mode
         moment_active = true;
         perm_active   = false;
+        mo_release_pending = false;
         vis_cache_valid = false;
     }
-    mo_counter++;
-}
-
-void layer_visualizer_momentary_stop(void) {
-    if (!feature_layer_vis()) return;
-    if (mo_counter == 0) return;
-
-    mo_counter--;
-    if (mo_counter == 0) {
-        // Last MO released — exit moment mode.
-        // The caller (layer_state_set_user) has already set mo_release_pending
-        // so the upcoming trigger() doesn't start the timer.
-        moment_active = false;
-        vis_cache_valid = false;
+    if (mo_count < MAX_HELD_MO) {
+        mo_positions[mo_count++] = mtx_pos;
     }
 }
 
-/// Called from layer_state_set_user when a layer bit was removed.
-/// This is the authoritative MO-release detection path: QMK removed the
-/// layer before calling this hook, so the layer state is already correct.
-void layer_visualizer_mo_released(void) {
+void layer_visualizer_momentary_release(uint16_t mtx_pos) {
     if (!feature_layer_vis()) return;
 
-    // Decrement the MO counter (if any MO was held)
-    if (mo_counter > 0) {
-        mo_counter--;
-        if (mo_counter == 0) {
-            // Last MO released
+    // Find this position — no-op for non-MO keys.
+    for (uint8_t i = 0; i < mo_count; i++) {
+        if (mo_positions[i] != mtx_pos) continue;
+
+        // Remove the entry (shift the rest down)
+        for (uint8_t j = i; j + 1 < mo_count; j++) {
+            mo_positions[j] = mo_positions[j + 1];
+        }
+        mo_count--;
+
+        if (mo_count == 0) {
+            // Last MO released — exit moment mode.  The upcoming
+            // layer_state_set_user runs trigger() which sees
+            // mo_release_pending and skips starting the timer.
             moment_active = false;
             vis_cache_valid = false;
             mo_release_pending = true;
-        }
-        // If counter > 0, other MO(s) still held — draw() reads live layer.
-        // Invalidate cache so the new live layer's colors are recomputed.
-        if (moment_active) {
+        } else {
+            // Other MO(s) still held — the layer stack changed; draw() reads
+            // the live layer anyway.  Invalidate the cache so the live
+            // layer's colors are recomputed.
             vis_cache_valid = false;
-        }
-    }
-}
-
-void layer_visualizer_trigger(void) {
-    if (!feature_layer_vis()) return;
-
-    if (!boot_done) {
-        if (get_highest_layer(layer_state) != boot_default_layer) {
-            boot_done = true;
         }
         return;
     }
+}
+
+/// Start the timer-based (permanent) overlay for the given layer.
+static void start_perm_display(uint8_t layer) {
+    vis_layer       = layer;
+    vis_cache_valid = false;
+    perm_active     = true;
+    perm_start      = timer_read32();
+}
+
+/// Called from layer_state_set_user with the NEW layer state.
+void layer_visualizer_trigger(layer_state_t state) {
+    if (!feature_layer_vis()) return;
+
+    // Suppress everything until the initial default-layer sync completes
+    // (first matrix scan).
+    if (!boot_done) return;
+
+    // Suppress layer changes that happen before the user touches the
+    // keyboard — boot-sync remnants, USB enumeration, Launcher/VIA
+    // connect commands.  The first key press arms the display.
+    if (!user_activity) return;
+
+    // No-op layer event — layer_on/layer_off of an already-set/cleared bit
+    // still calls layer_state_set with an unchanged state.  Inside this hook
+    // the global `layer_state` is still the pre-change value, so `state`
+    // equals it exactly when nothing actually changed.
+    if (state == layer_state) return;
 
     // Last MO release cleanup — skip timer start.
     if (mo_release_pending) {
         mo_release_pending = false;
-        vis_layer = get_highest_layer(layer_state);
         if (vis_locked) {
             // Locked: keep showing indefinitely
-            perm_active = true;
-            vis_cache_valid = false;
+            start_perm_display(get_highest_layer(state));
         }
         return;
     }
@@ -241,22 +268,8 @@ void layer_visualizer_trigger(void) {
         return;
     }
 
-    // Non-MO layer change (TO, TG, DF, layer_set) — update display.
-    vis_layer   = get_highest_layer(layer_state);
-    vis_cache_valid = false;
-    perm_active = true;
-    perm_start  = timer_read32();
-}
-
-bool layer_visualizer_is_active(void) {
-    return perm_active || moment_active;
-}
-
-// Called once after keyboard init + default-layer sync.
-// Before this, all layer_state_set_user calls are ignored.
-// We detect the initial sync by remembering the default layer.
-void layer_visualizer_init(void) {
-    boot_default_layer = get_highest_layer(default_layer_state);
+    // Non-MO layer change (TO, TG, DF, layer_set, VIA command) — update display.
+    start_perm_display(get_highest_layer(state));
 }
 
 // Called by matrix_scan_user after the initial default-layer sync.
@@ -266,10 +279,30 @@ void layer_visualizer_sync_complete(void) {
     boot_done    = true;
     moment_active = false;
     perm_active   = false;
-    mo_counter    = 0;
+    mo_count      = 0;
+    mo_release_pending = false;
+}
+
+/// Mark that the user has interacted with the keyboard.  Call from
+/// process_record_user on every key press.  This is the gate that keeps
+/// boot-time layer changes (sync, Launcher/VIA connect) from starting
+/// a display.
+void layer_visualizer_mark_user_activity(void) {
+    user_activity = true;
 }
 
 void layer_visualizer_task(void) {
+    if (!feature_layer_vis()) {
+        // Feature switched off (config tool): drop the lock latch and any
+        // active overlay so re-enabling starts fresh.
+        vis_locked = false;
+        perm_active = false;
+        moment_active = false;
+        mo_count = 0;
+        mo_release_pending = false;
+        vis_cache_valid = false;
+        return;
+    }
     if (moment_active)          return;
     if (!perm_active)           return;
     if (vis_locked)             return;  // locked: no auto-hide
@@ -281,35 +314,61 @@ void layer_visualizer_task(void) {
 void layer_vis_toggle(void) {
     feature_toggle_layer_vis();
     if (feature_layer_vis()) {
-        layer_visualizer_trigger();
+        // Show the current layer immediately (bypasses trigger()'s
+        // no-op guard — the state didn't change, we just enabled the feature).
+        start_perm_display(get_highest_layer(layer_state));
     }
+    // Disabling leaves cleanup to layer_visualizer_task() (same scan).
 }
 
 void layer_visualizer_cancel(void) {
     moment_active = false;
     perm_active   = false;
-    vis_locked    = false;
-    mo_counter    = 0;
+    mo_count      = 0;
     mo_release_pending = false;
     vis_cache_valid = false;
+    // vis_locked is intentionally preserved — the lock is a latch that
+    // survives overview; layer_visualizer_resume() restores the overlay
+    // when overview exits.
+}
+
+void layer_visualizer_resume(void) {
+    if (!feature_layer_vis()) return;
+    if (!vis_locked)           return;
+    if (feature_overview_is_active()) return;
+    start_perm_display(get_highest_layer(layer_state));
 }
 
 void layer_visualizer_lock_toggle(void) {
+    if (!feature_layer_vis()) return;  // master switch off — lock is inert
+
     vis_locked = !vis_locked;
     if (vis_locked) {
-        // Enter locked mode: start permanent display of current layer
-        vis_layer   = get_highest_layer(layer_state);
-        perm_active = true;
-        perm_start  = timer_read32();  // start timer (won't expire while locked)
-        vis_cache_valid = false;
+        // Enter locked mode.  The overlay only appears after overview
+        // exits (layer_visualizer_resume()) — inside overview the toggle
+        // state is shown by the IND_VIS_LOCK LED, like every other
+        // feature toggle.  If an MO is held, moment mode already shows
+        // the live layer and the release path starts the locked display.
+        if (!moment_active && !feature_overview_is_active()) {
+            start_perm_display(get_highest_layer(layer_state));
+        }
     } else {
-        // Unlocking: turn off the overlay
-        perm_active = false;
+        // Unlock: drop the overlay.  During an MO hold the live moment
+        // display continues; the release path now skips the permanent
+        // display since the lock is off.
+        if (!moment_active) {
+            perm_active = false;
+        }
     }
 }
 
+bool layer_visualizer_is_active(void) {
+    if (!feature_layer_vis()) return false;
+    return perm_active || moment_active;
+}
+
 bool layer_visualizer_is_locked(void) {
-    return vis_locked;
+    return vis_locked && feature_layer_vis();
 }
 
 
