@@ -157,6 +157,13 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // =============================================================================
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // ── Layer visualization: first key press after boot arms the overlay ─
+    // Layer changes before this (boot sync, USB enumeration, Launcher/VIA
+    // connect commands) never start a display.
+    if (record->event.pressed) {
+        layer_visualizer_mark_user_activity();
+    }
+
     // ── Tap-dance override ──────────────────────────────────────────────
     if (feature_tap_dance()) {
         if (!features_tap_process(keycode, record)) return false;
@@ -206,14 +213,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // ── Layer visualization: detect MO() key press ──────────────────
-    // PRESS detection is reliable here because the MO layer hasn't been
-    // added to the stack yet — IS_QK_MOMENTARY(keycode) resolves correctly.
-    // RELEASE is handled in layer_state_set_user (detects the layer bit
-    // being removed), so we don't handle it here.
-
-    if (record->event.pressed && IS_QK_MOMENTARY(keycode)) {
-        layer_visualizer_momentary_start();
+    // ── Layer visualization: MO key tracking by matrix position ──────
+    // PRESS: IS_QK_MOMENTARY(keycode) is reliable here because the MO
+    // layer hasn't been added yet, so the resolved keycode is correct.
+    // RELEASE: matched against the held-MO positions on EVERY key release.
+    // No keycode resolution is involved, so it works even when another MO
+    // on the stack changed the resolved keycode at this position.
+    uint16_t mtx_pos = PACK_MTX(record->event.key.row, record->event.key.col);
+    if (record->event.pressed) {
+        if (IS_QK_MOMENTARY(keycode)) {
+            layer_visualizer_momentary_start(mtx_pos);
+        }
+    } else {
+        layer_visualizer_momentary_release(mtx_pos);
     }
 
     return true;
@@ -225,16 +237,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Detect MO release: a layer bit was removed.  This works even if
-    // the resolved keycode changed because another MO altered the stack.
-    layer_state_t removed = layer_state & ~state;
-    if (removed) {
-        layer_visualizer_mo_released();
-    }
-
-    // Trigger timer-based vis for non-MO layer changes (TO, TG, DF),
-    // and update moment-mode display after MO press/release.
-    layer_visualizer_trigger();
+    // Trigger vis on every layer change.  `state` is the NEW layer state —
+    // the global layer_state is still the pre-change value inside this
+    // hook, so it must be passed explicitly.  This is the same source
+    // state_notify.c reports to the Keychron Launcher.
+    layer_visualizer_trigger(state);
     return state;
 }
 
@@ -310,7 +317,6 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
 
 void keyboard_post_init_user(void) {
     features_init();
-    layer_visualizer_init();
 }
 
 static layer_state_t last_default_layer = 0;
@@ -341,14 +347,10 @@ bool rgb_matrix_indicators_user(void) {
     indicator_draw();
 
     if (feature_overview_is_active()) {
-        // During overview with layer vis: show category colors, then
-        // overlay the layer-number LED in white on top.
-        if (layer_visualizer_is_active()) {
-            layer_visualizer_draw();
-            uint8_t led = indicator_led_for_layer();
-            if (led < RGB_MATRIX_LED_COUNT)
-                rgb_matrix_set_color(led, 255, 255, 255);
-        }
+        // Overview screen: indicator LEDs only (drawn by indicator_draw).
+        // The layer-visualization overlay — including the lock — is
+        // suspended while overview is open; a locked overlay resumes on
+        // exit via layer_visualizer_resume().
         return false;
     }
 
