@@ -10,6 +10,7 @@
 #include "indicators.h"
 #include "keycodes.h"
 #include "keymap_introspection.h"
+#include "dynamic_keymap.h"
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -99,36 +100,6 @@ static const uint8_t PROGMEM cat_colors[12][3] = {
     [CAT_CUSTOM]    = LV_COLOR_CUSTOM,    [CAT_LAYER]     = LV_COLOR_LAYER,
 };
 
-// ── Per-LED color cache ─────────────────────────────────────────────────
-// Computed once per vis transition (layer change or MO hold/release),
-// then applied every RGB frame without recomputing keycode lookups.
-static uint8_t  vis_cache[RGB_MATRIX_LED_COUNT][3];
-static bool     vis_cache_valid = false;
-
-static void build_cache(uint8_t layer) {
-    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
-        uint16_t mtx  = led_to_mtx[led];
-        uint8_t  row  = (mtx >> 8) & 0xFF;
-        uint8_t  col  = mtx & 0xFF;
-        uint16_t kc   = keycode_at_keymap_location_raw(layer, row, col);
-        key_category_t cat = categorize(kc);
-        vis_cache[led][0] = pgm_read_byte(&cat_colors[cat][0]);
-        vis_cache[led][1] = pgm_read_byte(&cat_colors[cat][1]);
-        vis_cache[led][2] = pgm_read_byte(&cat_colors[cat][2]);
-    }
-    vis_cache_valid = true;
-}
-
-static void apply_cache(void) {
-    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
-        rgb_matrix_set_color(led,
-                             vis_cache[led][0],
-                             vis_cache[led][1],
-                             vis_cache[led][2]);
-    }
-}
-
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 // State
@@ -189,7 +160,6 @@ void layer_visualizer_momentary_start(uint16_t mtx_pos) {
         moment_active = true;
         perm_active   = false;
         mo_release_pending = false;
-        vis_cache_valid = false;
     }
     if (mo_count < MAX_HELD_MO) {
         mo_positions[mo_count++] = mtx_pos;
@@ -214,13 +184,7 @@ void layer_visualizer_momentary_release(uint16_t mtx_pos) {
             // layer_state_set_user runs trigger() which sees
             // mo_release_pending and skips starting the timer.
             moment_active = false;
-            vis_cache_valid = false;
             mo_release_pending = true;
-        } else {
-            // Other MO(s) still held — the layer stack changed; draw() reads
-            // the live layer anyway.  Invalidate the cache so the live
-            // layer's colors are recomputed.
-            vis_cache_valid = false;
         }
         return;
     }
@@ -229,7 +193,6 @@ void layer_visualizer_momentary_release(uint16_t mtx_pos) {
 /// Start the timer-based (permanent) overlay for the given layer.
 static void start_perm_display(uint8_t layer) {
     vis_layer       = layer;
-    vis_cache_valid = false;
     perm_active     = true;
     perm_start      = timer_read32();
 }
@@ -264,7 +227,6 @@ void layer_visualizer_trigger(layer_state_t state) {
     }
 
     if (moment_active) {
-        vis_cache_valid = false;
         return;
     }
 
@@ -300,7 +262,6 @@ void layer_visualizer_task(void) {
         moment_active = false;
         mo_count = 0;
         mo_release_pending = false;
-        vis_cache_valid = false;
         return;
     }
     if (moment_active)          return;
@@ -326,7 +287,6 @@ void layer_visualizer_cancel(void) {
     perm_active   = false;
     mo_count      = 0;
     mo_release_pending = false;
-    vis_cache_valid = false;
     // vis_locked is intentionally preserved — the lock is a latch that
     // survives overview; layer_visualizer_resume() restores the overlay
     // when overview exits.
@@ -375,10 +335,24 @@ bool layer_visualizer_is_locked(void) {
 // ═════════════════════════════════════════════════════════════════════════════
 // Drawing
 // ═════════════════════════════════════════════════════════════════════════════
+//
+// Reads keycodes from the LIVE dynamic keymap (EEPROM-backed) on every
+// frame, so remapping a key in the Keychron Launcher / VIA immediately
+// updates the overlay colors.  The EEPROM reads are fast (flash-backed
+// NVM on STM32, ~100 ns each) — 68 LEDs × 2 bytes ≈ 14 µs per frame.
 
 static void draw_layer(uint8_t layer) {
-    if (!vis_cache_valid) build_cache(layer);
-    apply_cache();
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        uint16_t mtx  = led_to_mtx[led];
+        uint8_t  row  = (mtx >> 8) & 0xFF;
+        uint8_t  col  = mtx & 0xFF;
+        uint16_t kc   = dynamic_keymap_get_keycode(layer, row, col);
+        key_category_t cat = categorize(kc);
+        rgb_matrix_set_color(led,
+                             pgm_read_byte(&cat_colors[cat][0]),
+                             pgm_read_byte(&cat_colors[cat][1]),
+                             pgm_read_byte(&cat_colors[cat][2]));
+    }
 }
 
 void layer_visualizer_draw(void) {
