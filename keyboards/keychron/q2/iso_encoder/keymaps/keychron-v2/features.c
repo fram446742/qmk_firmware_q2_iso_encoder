@@ -107,6 +107,14 @@ static bool tap_matches(const eeprom_tap_t *ov, uint16_t keycode, keyrecord_t *r
 }
 
 bool features_tap_process(uint16_t keycode, keyrecord_t *record) {
+    // Modifier bypass: if any modifier is held (Ctrl, Alt, Shift, GUI),
+    // skip the tap override and let the key pass through immediately.
+    // This preserves modifier+key combinations like Ctrl+Backspace.
+    uint8_t mods = get_mods();
+    if (mods != 0) {
+        return true;  // Let the key pass through normally
+    }
+
     for (int i = 0; i < eeprom_tap_count; i++) {
         if (!tap_matches(&eeprom_tap[i], keycode, record)) continue;
 
@@ -341,7 +349,7 @@ void feature_set(uint8_t flag, bool on) {
 
 void features_load_config(void) {
     eeprom_tap_count = eeprom_read_byte((const uint8_t *)EEP_TAP_BASE);
-    if (eeprom_tap_count == 0xFF || eeprom_tap_count > MAX_TAP_OVERRIDES) {
+    if (eeprom_tap_count == 0xFF || eeprom_tap_count == 0 || eeprom_tap_count > MAX_TAP_OVERRIDES) {
         features_load_defaults();
         features_save_config();
         return;
