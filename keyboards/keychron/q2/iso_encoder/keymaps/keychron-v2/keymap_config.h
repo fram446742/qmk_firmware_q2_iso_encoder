@@ -79,7 +79,8 @@
 #define MAX_TAP_OVERRIDES  20
 #define MAX_COMBOS          8
 #define MAX_LEADERS        16
-#define MAX_POS_COMBOS      8     ///< Position-based (custom processor) combos
+// Position-combo array sizes are derived from POS_COMBOS_DEFS at compile
+// time in features.c — no MAX_POS_COMBOS needed.
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -324,51 +325,38 @@ enum combo_events {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// LED INDICATOR INDICES  (Q2 ISO-Encoder physical LED order)
+// LED INDICATOR INDICES  (LED index in g_snled27351_leds[] order)
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// These match g_snled27351_leds[] order in iso_encoder.c.  During normal
-// operation only CAPS_LOCK lights.  The others illuminate in overview mode.
+// Derived from POS_IDX_xxx macros in key_positions.h (auto-generated from
+// keyboard.json + the hardware LED wiring).  These match the physical LED
+// of each key.  During normal operation only CAPS_LOCK lights; the others
+// illuminate in overview mode.
 //
-//  Index  Key   Purpose
-//  ─────  ───   ──────────────────────────
-//   28    Caps  Hardware Caps Lock state
-//   29    A     Auto-Shift ON
-//   30    S     Auto-Correct ON
-//   19    T     Tap Dance ON
-//   47    C     Caps Word processing ON
-//   18    R     Repeat Key ON
-//   31    D     Dynamic Macro ON
-//   37    L     Leader Key ON
-//   50    N     NKRO ON
+//  Key   Purpose
+//  ───   ──────────────────────────
+//  Caps  Hardware Caps Lock state (handled by keychron_rgb.c, not here)
+//  A     Auto-Shift ON
+//  S     Auto-Correct ON
+//  T     Tap Dance ON
+//  C     Caps Word processing ON
+//  R     Repeat Key ON
+//  D     Dynamic Macro ON
+//  L     Leader Key ON
+//  N     NKRO ON
+//  9     Layer-visualization lock ON (overview mode)
 
-// ── Numeric LED indices (direct, no dependencies):
-#define IND_AUTO_SHIFT  29
-// #define IND_AUTO_SHIFT POS_IDX_KC_A
+#define IND_AUTO_SHIFT  POS_IDX_KC_A
+#define IND_TAP_DANCE   POS_IDX_KC_T
+#define IND_CAPS_WORD   POS_IDX_KC_C
+#define IND_REPEAT_KEY  POS_IDX_KC_R
+#define IND_DYN_MACRO   POS_IDX_KC_D
+#define IND_LEADER      POS_IDX_KC_L
+#define IND_AUTOCORRECT POS_IDX_KC_S
+#define IND_NKRO        POS_IDX_KC_N
 
-#define IND_TAP_DANCE   19
-// #define IND_TAP_DANCE  POS_IDX_KC_T
-
-#define IND_CAPS_WORD   47
-// #define IND_CAPS_WORD  POS_IDX_KC_C
-
-#define IND_REPEAT_KEY  18
-// #define IND_REPEAT_KEY POS_IDX_KC_R
-
-#define IND_DYN_MACRO   31
-// #define IND_DYN_MACRO  POS_IDX_KC_D
-
-#define IND_LEADER      37
-// #define IND_LEADER     POS_IDX_KC_L
-
-#define IND_AUTOCORRECT 30
-// #define IND_AUTOCORRECT POS_IDX_KC_S
-
-#define IND_NKRO        50
-// #define IND_NKRO       POS_IDX_KC_N
-
-// Layer-visualization lock indicator (9 key, LED index 9)
-#define IND_VIS_LOCK    9
+// Layer-visualization lock indicator (the "9" key)
+#define IND_VIS_LOCK    POS_IDX_KC_9
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows

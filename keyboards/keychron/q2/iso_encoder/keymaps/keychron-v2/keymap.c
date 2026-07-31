@@ -174,34 +174,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!features_combo_process(keycode, record)) return false;
 
     // ── Interactive overview mode ───────────────────────────────────────
+    // While overview is open every key press is consumed by the dispatch
+    // in indicators.c (feature toggles, layer jumps, or exit).
     if (record->event.pressed && feature_overview_is_active()) {
-        uint8_t r = record->event.key.row;
-        uint8_t c = record->event.key.col;
-        switch ((r << 4) | c) {
-            case (2 << 4) | 1: feature_toggle_auto_shift();    feature_overview_reset_timer(); return false;
-            case (2 << 4) | 2: autocorrect_toggle();          feature_overview_reset_timer(); return false;
-            case (1 << 4) | 5: feature_toggle_tap_dance();    feature_overview_reset_timer(); return false;
-            case (3 << 4) | 4: feature_toggle_caps_word();    feature_overview_reset_timer(); return false;
-            case (1 << 4) | 4: feature_toggle_repeat_key();   feature_overview_reset_timer(); return false;
-            case (2 << 4) | 3: feature_toggle_dyn_macro();    feature_overview_reset_timer(); return false;
-            case (2 << 4) | 9: feature_toggle_leader();       feature_overview_reset_timer(); return false;
-            case (3 << 4) | 7:
-                clear_keyboard();
-                keymap_config.nkro = !keymap_config.nkro;
-                feature_overview_reset_timer();
-                return false;
-            case (0 << 4) | 10: LAYER_MOVE_OR_DEFAULT(0);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 1:  LAYER_MOVE_OR_DEFAULT(1);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 2:  LAYER_MOVE_OR_DEFAULT(2);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 3:  LAYER_MOVE_OR_DEFAULT(3);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 4:  LAYER_MOVE_OR_DEFAULT(4);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 5:  LAYER_MOVE_OR_DEFAULT(5);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 6:  LAYER_MOVE_OR_DEFAULT(6);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 7:  LAYER_MOVE_OR_DEFAULT(7);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 8:  LAYER_MOVE_OR_DEFAULT(8);  feature_overview_reset_timer(); return false;
-            case (0 << 4) | 9:  layer_visualizer_lock_toggle(); feature_overview_reset_timer(); return false;
-            default:            feature_overview_cancel();  return false;
-        }
+        feature_overview_handle_key(record);
+        return false;
     }
 
     // ── Combo-only actions ─────────────────────────────────────────────
@@ -246,74 +223,11 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// HID config handler  — used by qmk_config_tool.py for export/import
-// ═════════════════════════════════════════════════════════════════════════════
-
-void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
-    uint8_t cmd  = data[0];
-    uint8_t vid  = data[2];
-    uint8_t idx  = data[3];
-    uint8_t *pay = data + 4;
-    uint8_t pay_len = length - 4;
-
-    if (data[1] != 0x00) return;
-
-    if (cmd == 0x08) {
-        switch (vid) {
-            case VALUE_FLAGS:        data[3] = g_feature_flags;                              break;
-            case VALUE_TAP_COUNT:    data[3] = eeprom_tap_count;                             break;
-            case VALUE_TAP_ENTRY:
-                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t))
-                    memcpy(pay, &eeprom_tap[idx], sizeof(eeprom_tap_t));
-                break;
-            case VALUE_COMBO_COUNT:  data[3] = eeprom_combo_count;                           break;
-            case VALUE_COMBO_ENTRY:
-                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t))
-                    memcpy(pay, &eeprom_combos[idx], sizeof(eeprom_combo_t));
-                break;
-            case VALUE_LEADER_COUNT: data[3] = eeprom_leader_count;                          break;
-            case VALUE_LEADER_ENTRY:
-                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t))
-                    memcpy(pay, &eeprom_leaders[idx], sizeof(eeprom_leader_t));
-                break;
-        }
-    } else if (cmd == 0x07) {
-        switch (vid) {
-            case VALUE_FLAGS:
-                g_feature_flags = idx;
-                feature_apply_all();
-                features_save();
-                break;
-            case VALUE_TAP_COUNT:
-                eeprom_tap_count = (idx < MAX_TAP_OVERRIDES) ? idx : MAX_TAP_OVERRIDES;
-                break;
-            case VALUE_TAP_ENTRY:
-                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t))
-                    memcpy(&eeprom_tap[idx], pay, sizeof(eeprom_tap_t));
-                break;
-            case VALUE_COMBO_COUNT:
-                eeprom_combo_count = (idx < MAX_COMBOS) ? idx : MAX_COMBOS;
-                break;
-            case VALUE_COMBO_ENTRY:
-                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t))
-                    memcpy(&eeprom_combos[idx], pay, sizeof(eeprom_combo_t));
-                break;
-            case VALUE_LEADER_COUNT:
-                eeprom_leader_count = (idx < MAX_LEADERS) ? idx : MAX_LEADERS;
-                break;
-            case VALUE_LEADER_ENTRY:
-                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t))
-                    memcpy(&eeprom_leaders[idx], pay, sizeof(eeprom_leader_t));
-                break;
-        }
-    } else if (cmd == 0x09) {
-        features_save_config();
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
 // Init / scan / indicators
 // ═════════════════════════════════════════════════════════════════════════════
+//
+// NOTE: the HID config protocol (via_custom_value_command_kb) used by
+// qmk_config_tool.py lives in features.c next to the EEPROM data it serves.
 
 void keyboard_post_init_user(void) {
     features_init();

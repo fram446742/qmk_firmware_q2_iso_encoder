@@ -61,10 +61,9 @@ void features_combo_task(void);
 // ═════════════════════════════════════════════════════════════════════════════
 // EEPROM-backed config arrays  (extern declarations)
 // ═════════════════════════════════════════════════════════════════════════════
-// Struct types, EEPROM addresses, and HID protocol constants are in
-// keymap_config.h.  The Python tool (qmk_config_tool.py) reads this header
-// for VALUE_* / EEP_* constants — keep it in sync or point the Python tool
-// at keymap_config.h.
+// Struct types, EEPROM addresses, and HID protocol constants live in
+// keymap_config.h.  The Python tool (qmk_config_tool.py) parses
+// keymap_config.h at import time to stay in sync with the firmware.
 
 #include "keymap_config.h"
 

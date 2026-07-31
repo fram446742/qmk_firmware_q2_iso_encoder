@@ -55,162 +55,161 @@
 #define POS_IDX_KC_BSPC 13                    // KC_BSPC
 
 #define POS_KC_MUTE     PACK_MTX(0, 14)  // KC_MUTE
-#define POS_IDX_KC_MUTE 14                    // KC_MUTE
 
 #define POS_KC_TAB     PACK_MTX(1, 0)  // KC_TAB
-#define POS_IDX_KC_TAB 15                    // KC_TAB
+#define POS_IDX_KC_TAB 14                    // KC_TAB
 
 #define POS_KC_Q     PACK_MTX(1, 1)  // KC_Q
-#define POS_IDX_KC_Q 16                    // KC_Q
+#define POS_IDX_KC_Q 15                    // KC_Q
 
 #define POS_KC_W     PACK_MTX(1, 2)  // KC_W
-#define POS_IDX_KC_W 17                    // KC_W
+#define POS_IDX_KC_W 16                    // KC_W
 
 #define POS_KC_E     PACK_MTX(1, 3)  // KC_E
-#define POS_IDX_KC_E 18                    // KC_E
+#define POS_IDX_KC_E 17                    // KC_E
 
 #define POS_KC_R     PACK_MTX(1, 4)  // KC_R
-#define POS_IDX_KC_R 19                    // KC_R
+#define POS_IDX_KC_R 18                    // KC_R
 
 #define POS_KC_T     PACK_MTX(1, 5)  // KC_T
-#define POS_IDX_KC_T 20                    // KC_T
+#define POS_IDX_KC_T 19                    // KC_T
 
 #define POS_KC_Y     PACK_MTX(1, 6)  // KC_Y
-#define POS_IDX_KC_Y 21                    // KC_Y
+#define POS_IDX_KC_Y 20                    // KC_Y
 
 #define POS_KC_U     PACK_MTX(1, 7)  // KC_U
-#define POS_IDX_KC_U 22                    // KC_U
+#define POS_IDX_KC_U 21                    // KC_U
 
 #define POS_KC_I     PACK_MTX(1, 8)  // KC_I
-#define POS_IDX_KC_I 23                    // KC_I
+#define POS_IDX_KC_I 22                    // KC_I
 
 #define POS_KC_O     PACK_MTX(1, 9)  // KC_O
-#define POS_IDX_KC_O 24                    // KC_O
+#define POS_IDX_KC_O 23                    // KC_O
 
 #define POS_KC_P     PACK_MTX(1, 10)  // KC_P
-#define POS_IDX_KC_P 25                    // KC_P
+#define POS_IDX_KC_P 24                    // KC_P
 
 #define POS_KC_LBRC     PACK_MTX(1, 11)  // KC_LBRC
-#define POS_IDX_KC_LBRC 26                    // KC_LBRC
+#define POS_IDX_KC_LBRC 25                    // KC_LBRC
 
 #define POS_KC_RBRC     PACK_MTX(1, 12)  // KC_RBRC
-#define POS_IDX_KC_RBRC 27                    // KC_RBRC
+#define POS_IDX_KC_RBRC 26                    // KC_RBRC
 
 #define POS_KC_DEL     PACK_MTX(1, 14)  // KC_DEL
-#define POS_IDX_KC_DEL 28                    // KC_DEL
+#define POS_IDX_KC_DEL 27                    // KC_DEL
 
 #define POS_KC_CAPS     PACK_MTX(2, 0)  // KC_CAPS
-#define POS_IDX_KC_CAPS 29                    // KC_CAPS
+#define POS_IDX_KC_CAPS 28                    // KC_CAPS
 
 #define POS_KC_A     PACK_MTX(2, 1)  // KC_A
-#define POS_IDX_KC_A 30                    // KC_A
+#define POS_IDX_KC_A 29                    // KC_A
 
 #define POS_KC_S     PACK_MTX(2, 2)  // KC_S
-#define POS_IDX_KC_S 31                    // KC_S
+#define POS_IDX_KC_S 30                    // KC_S
 
 #define POS_KC_D     PACK_MTX(2, 3)  // KC_D
-#define POS_IDX_KC_D 32                    // KC_D
+#define POS_IDX_KC_D 31                    // KC_D
 
 #define POS_KC_F     PACK_MTX(2, 4)  // KC_F
-#define POS_IDX_KC_F 33                    // KC_F
+#define POS_IDX_KC_F 32                    // KC_F
 
 #define POS_KC_G     PACK_MTX(2, 5)  // KC_G
-#define POS_IDX_KC_G 34                    // KC_G
+#define POS_IDX_KC_G 33                    // KC_G
 
 #define POS_KC_H     PACK_MTX(2, 6)  // KC_H
-#define POS_IDX_KC_H 35                    // KC_H
+#define POS_IDX_KC_H 34                    // KC_H
 
 #define POS_KC_J     PACK_MTX(2, 7)  // KC_J
-#define POS_IDX_KC_J 36                    // KC_J
+#define POS_IDX_KC_J 35                    // KC_J
 
 #define POS_KC_K     PACK_MTX(2, 8)  // KC_K
-#define POS_IDX_KC_K 37                    // KC_K
+#define POS_IDX_KC_K 36                    // KC_K
 
 #define POS_KC_L     PACK_MTX(2, 9)  // KC_L
-#define POS_IDX_KC_L 38                    // KC_L
+#define POS_IDX_KC_L 37                    // KC_L
 
 #define POS_KC_SCLN     PACK_MTX(2, 10)  // KC_SCLN
-#define POS_IDX_KC_SCLN 39                    // KC_SCLN
+#define POS_IDX_KC_SCLN 38                    // KC_SCLN
 
 #define POS_KC_QUOT     PACK_MTX(2, 11)  // KC_QUOT
-#define POS_IDX_KC_QUOT 40                    // KC_QUOT
+#define POS_IDX_KC_QUOT 39                    // KC_QUOT
 
 #define POS_KC_NUHS     PACK_MTX(2, 13)  // KC_NUHS
-#define POS_IDX_KC_NUHS 41                    // KC_NUHS
+#define POS_IDX_KC_NUHS 40                    // KC_NUHS
 
 #define POS_KC_ENT     PACK_MTX(1, 13)  // KC_ENT
-#define POS_IDX_KC_ENT 42                    // KC_ENT
+#define POS_IDX_KC_ENT 41                    // KC_ENT
 
 #define POS_KC_HOME     PACK_MTX(2, 14)  // KC_HOME
-#define POS_IDX_KC_HOME 43                    // KC_HOME
+#define POS_IDX_KC_HOME 42                    // KC_HOME
 
 #define POS_KC_LSFT     PACK_MTX(3, 0)  // KC_LSFT
-#define POS_IDX_KC_LSFT 44                    // KC_LSFT
+#define POS_IDX_KC_LSFT 43                    // KC_LSFT
 
 #define POS_KC_NUBS     PACK_MTX(3, 1)  // KC_NUBS
-#define POS_IDX_KC_NUBS 45                    // KC_NUBS
+#define POS_IDX_KC_NUBS 44                    // KC_NUBS
 
 #define POS_KC_Z     PACK_MTX(3, 2)  // KC_Z
-#define POS_IDX_KC_Z 46                    // KC_Z
+#define POS_IDX_KC_Z 45                    // KC_Z
 
 #define POS_KC_X     PACK_MTX(3, 3)  // KC_X
-#define POS_IDX_KC_X 47                    // KC_X
+#define POS_IDX_KC_X 46                    // KC_X
 
 #define POS_KC_C     PACK_MTX(3, 4)  // KC_C
-#define POS_IDX_KC_C 48                    // KC_C
+#define POS_IDX_KC_C 47                    // KC_C
 
 #define POS_KC_V     PACK_MTX(3, 5)  // KC_V
-#define POS_IDX_KC_V 49                    // KC_V
+#define POS_IDX_KC_V 48                    // KC_V
 
 #define POS_KC_B     PACK_MTX(3, 6)  // KC_B
-#define POS_IDX_KC_B 50                    // KC_B
+#define POS_IDX_KC_B 49                    // KC_B
 
 #define POS_KC_N     PACK_MTX(3, 7)  // KC_N
-#define POS_IDX_KC_N 51                    // KC_N
+#define POS_IDX_KC_N 50                    // KC_N
 
 #define POS_KC_M     PACK_MTX(3, 8)  // KC_M
-#define POS_IDX_KC_M 52                    // KC_M
+#define POS_IDX_KC_M 51                    // KC_M
 
 #define POS_KC_COMM     PACK_MTX(3, 9)  // KC_COMM
-#define POS_IDX_KC_COMM 53                    // KC_COMM
+#define POS_IDX_KC_COMM 52                    // KC_COMM
 
 #define POS_KC_DOT     PACK_MTX(3, 10)  // KC_DOT
-#define POS_IDX_KC_DOT 54                    // KC_DOT
+#define POS_IDX_KC_DOT 53                    // KC_DOT
 
 #define POS_KC_SLSH     PACK_MTX(3, 11)  // KC_SLSH
-#define POS_IDX_KC_SLSH 55                    // KC_SLSH
+#define POS_IDX_KC_SLSH 54                    // KC_SLSH
 
 #define POS_KC_RSFT     PACK_MTX(3, 13)  // KC_RSFT
-#define POS_IDX_KC_RSFT 56                    // KC_RSFT
+#define POS_IDX_KC_RSFT 55                    // KC_RSFT
 
 #define POS_KC_UP     PACK_MTX(3, 14)  // KC_UP
-#define POS_IDX_KC_UP 57                    // KC_UP
+#define POS_IDX_KC_UP 56                    // KC_UP
 
 #define POS_KC_LCTL     PACK_MTX(4, 0)  // KC_LCTL
-#define POS_IDX_KC_LCTL 58                    // KC_LCTL
+#define POS_IDX_KC_LCTL 57                    // KC_LCTL
 
 #define POS_KC_LOPTN     PACK_MTX(4, 1)  // KC_LOPTN
-#define POS_IDX_KC_LOPTN 59                    // KC_LOPTN
+#define POS_IDX_KC_LOPTN 58                    // KC_LOPTN
 
 #define POS_KC_LCMMD     PACK_MTX(4, 2)  // KC_LCMMD
-#define POS_IDX_KC_LCMMD 60                    // KC_LCMMD
+#define POS_IDX_KC_LCMMD 59                    // KC_LCMMD
 
 #define POS_KC_SPC     PACK_MTX(4, 6)  // KC_SPC
-#define POS_IDX_KC_SPC 61                    // KC_SPC
+#define POS_IDX_KC_SPC 60                    // KC_SPC
 
 #define POS_KC_RCMMD     PACK_MTX(4, 10)  // KC_RCMMD
-#define POS_IDX_KC_RCMMD 62                    // KC_RCMMD
+#define POS_IDX_KC_RCMMD 61                    // KC_RCMMD
 
 #define POS_KC_LEFT     PACK_MTX(4, 13)  // KC_LEFT
-#define POS_IDX_KC_LEFT 65                    // KC_LEFT
+#define POS_IDX_KC_LEFT 64                    // KC_LEFT
 
 #define POS_KC_DOWN     PACK_MTX(2, 12)  // KC_DOWN
 #define POS_IDX_KC_DOWN 66                    // KC_DOWN
 
 #define POS_KC_RGHT     PACK_MTX(4, 14)  // KC_RGHT
-#define POS_IDX_KC_RGHT 67                    // KC_RGHT
+#define POS_IDX_KC_RGHT 65                    // KC_RGHT
 
-// Total: 66 keys
+// Total: 66 keys, 67 with LEDs
 
 // ── LED-index → matrix-position lookup (for layer visualization) ──
 // 68 layout entries, 67 with LEDs (1 skipped)
@@ -280,7 +279,7 @@ static const uint16_t PROGMEM led_to_mtx[67] = {
     PACK_MTX(4, 11),
     PACK_MTX(4, 12),
     PACK_MTX(4, 13),
-    PACK_MTX(2, 12),
     PACK_MTX(4, 14),
+    PACK_MTX(2, 12),
 };
 

@@ -14,7 +14,6 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 #include "keymap_config.h"
-#include "key_positions.h"
 
 #ifdef AUTO_SHIFT_ENABLE
 #    include "process_auto_shift.h"
@@ -169,20 +168,21 @@ void features_tap_task(void) {
 // position, using the same POS_KC_xxx macros from
 // key_positions.h that the tap-dance override uses.
 
-// Runtime state: one entry per position combo
-static struct {
-    uint8_t  down;         ///< bitmask: which keys are currently held
-    uint16_t timer;        ///< timer when first key went down
-    bool     fired;        ///< output was already sent
-} pos_cb_state[MAX_POS_COMBOS];
-
-// Compiled-in position combo definitions from keymap_config.h
-static const pos_combo_def_t pos_combos[MAX_POS_COMBOS] = {
+// Compiled-in position combo definitions from keymap_config.h.
+// Sized to the actual number of POS_COMBOS_DEFS entries (no fixed MAX).
+static const pos_combo_def_t pos_combos[] = {
     POS_COMBOS_DEFS
 };
 
 // Number of entries in pos_combos (compile-time)
 #define POS_COMBO_COUNT ((uint8_t)(sizeof(pos_combos) / sizeof(pos_combos[0])))
+
+// Runtime state: one entry per position combo
+static struct {
+    uint8_t  down;         ///< bitmask: which keys are currently held
+    uint16_t timer;        ///< timer when first key went down
+    bool     fired;        ///< output was already sent
+} pos_cb_state[POS_COMBO_COUNT];
 
 bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
     uint8_t mtx_pos = PACK_MTX(record->event.key.row, record->event.key.col);
@@ -346,30 +346,34 @@ void features_load_config(void) {
         features_save_config();
         return;
     }
-    eeprom_read_block(eeprom_tap,    (void *)(EEP_TAP_BASE + 1),     EEP_TAP_SIZE);
+    // Read only the entries that are actually in use (count-sized),
+    // not the full reserved region — fewer EEPROM reads at boot.
+    eeprom_read_block(eeprom_tap, (void *)(EEP_TAP_BASE + 1), eeprom_tap_count * sizeof(eeprom_tap_t));
 
     eeprom_combo_count = eeprom_read_byte((const uint8_t *)EEP_COMBO_BASE);
     if (eeprom_combo_count == 0xFF || eeprom_combo_count > MAX_COMBOS) {
         eeprom_combo_count = 0;
     } else {
-        eeprom_read_block(eeprom_combos, (void *)(EEP_COMBO_BASE + 1), EEP_COMBO_SIZE);
+        eeprom_read_block(eeprom_combos, (void *)(EEP_COMBO_BASE + 1), eeprom_combo_count * sizeof(eeprom_combo_t));
     }
 
     eeprom_leader_count = eeprom_read_byte((const uint8_t *)EEP_LEADER_BASE);
     if (eeprom_leader_count == 0xFF || eeprom_leader_count > MAX_LEADERS) {
         eeprom_leader_count = 0;
     } else {
-        eeprom_read_block(eeprom_leaders, (void *)(EEP_LEADER_BASE + 1), EEP_LEADER_SIZE);
+        eeprom_read_block(eeprom_leaders, (void *)(EEP_LEADER_BASE + 1), eeprom_leader_count * sizeof(eeprom_leader_t));
     }
 }
 
 void features_save_config(void) {
-    eeprom_write_byte((uint8_t *)EEP_TAP_BASE,      eeprom_tap_count);
-    eeprom_write_block(eeprom_tap,    (void *)(EEP_TAP_BASE + 1),     EEP_TAP_SIZE);
-    eeprom_write_byte((uint8_t *)EEP_COMBO_BASE,    eeprom_combo_count);
-    eeprom_write_block(eeprom_combos, (void *)(EEP_COMBO_BASE + 1),   EEP_COMBO_SIZE);
-    eeprom_write_byte((uint8_t *)EEP_LEADER_BASE,   eeprom_leader_count);
-    eeprom_write_block(eeprom_leaders,(void *)(EEP_LEADER_BASE + 1),  EEP_LEADER_SIZE);
+    // Write only the in-use entries — less EEPROM wear than writing the
+    // full reserved region on every import.
+    eeprom_write_byte((uint8_t *)EEP_TAP_BASE, eeprom_tap_count);
+    eeprom_write_block(eeprom_tap, (void *)(EEP_TAP_BASE + 1), eeprom_tap_count * sizeof(eeprom_tap_t));
+    eeprom_write_byte((uint8_t *)EEP_COMBO_BASE, eeprom_combo_count);
+    eeprom_write_block(eeprom_combos, (void *)(EEP_COMBO_BASE + 1), eeprom_combo_count * sizeof(eeprom_combo_t));
+    eeprom_write_byte((uint8_t *)EEP_LEADER_BASE, eeprom_leader_count);
+    eeprom_write_block(eeprom_leaders, (void *)(EEP_LEADER_BASE + 1), eeprom_leader_count * sizeof(eeprom_leader_t));
 }
 
 // ── Sentinel-terminated default arrays (count derived at compile time) ─────
@@ -401,5 +405,85 @@ void features_load_defaults(void) {
     eeprom_leader_count = LEADER_DEFAULTS_COUNT;
     for (int i = 0; i < LEADER_DEFAULTS_COUNT && i < MAX_LEADERS; i++) {
         eeprom_leaders[i] = leader_defaults_all[i];
+    }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HID config protocol  (via_custom_value_command_kb — qmk_config_tool.py)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Strong override of the weak handler in quantum/via.c.  Speaks QMK's VIA
+// custom-value protocol over Raw HID so the host tool (qmk_config_tool.py
+// in this keymap directory) can export/import the EEPROM-backed feature
+// config.  Value IDs (VALUE_*) and wire layout are defined in
+// keymap_config.h — the Python tool parses that header to stay in sync.
+//
+// Wire format (32-byte VIA custom value payload):
+//   data[0] = command  0x08 read (get) | 0x07 write (set) | 0x09 save
+//   data[1] = channel  (0)
+//   data[2] = value ID (VALUE_*)
+//   data[3] = index    (entry index, or value byte for single-byte values)
+//   data[4..] = payload (entry data on write; response on read)
+
+void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+    uint8_t cmd      = data[0];
+    uint8_t vid      = data[2];
+    uint8_t idx      = data[3];
+    uint8_t *pay     = data + 4;
+    uint8_t pay_len  = length - 4;
+
+    if (data[1] != 0x00) return;
+
+    if (cmd == 0x08) {  // READ (get)
+        switch (vid) {
+            case VALUE_FLAGS:        data[3] = g_feature_flags;                              break;
+            case VALUE_TAP_COUNT:    data[3] = eeprom_tap_count;                             break;
+            case VALUE_TAP_ENTRY:
+                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t))
+                    memcpy(pay, &eeprom_tap[idx], sizeof(eeprom_tap_t));
+                break;
+            case VALUE_COMBO_COUNT:  data[3] = eeprom_combo_count;                           break;
+            case VALUE_COMBO_ENTRY:
+                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t))
+                    memcpy(pay, &eeprom_combos[idx], sizeof(eeprom_combo_t));
+                break;
+            case VALUE_LEADER_COUNT: data[3] = eeprom_leader_count;                          break;
+            case VALUE_LEADER_ENTRY:
+                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t))
+                    memcpy(pay, &eeprom_leaders[idx], sizeof(eeprom_leader_t));
+                break;
+        }
+    } else if (cmd == 0x07) {  // WRITE (set)
+        switch (vid) {
+            case VALUE_FLAGS:
+                g_feature_flags = idx;
+                feature_apply_all();
+                features_save();
+                break;
+            case VALUE_TAP_COUNT:
+                eeprom_tap_count = (idx < MAX_TAP_OVERRIDES) ? idx : MAX_TAP_OVERRIDES;
+                break;
+            case VALUE_TAP_ENTRY:
+                if (idx < eeprom_tap_count && pay_len >= sizeof(eeprom_tap_t))
+                    memcpy(&eeprom_tap[idx], pay, sizeof(eeprom_tap_t));
+                break;
+            case VALUE_COMBO_COUNT:
+                eeprom_combo_count = (idx < MAX_COMBOS) ? idx : MAX_COMBOS;
+                break;
+            case VALUE_COMBO_ENTRY:
+                if (idx < eeprom_combo_count && pay_len >= sizeof(eeprom_combo_t))
+                    memcpy(&eeprom_combos[idx], pay, sizeof(eeprom_combo_t));
+                break;
+            case VALUE_LEADER_COUNT:
+                eeprom_leader_count = (idx < MAX_LEADERS) ? idx : MAX_LEADERS;
+                break;
+            case VALUE_LEADER_ENTRY:
+                if (idx < eeprom_leader_count && pay_len >= sizeof(eeprom_leader_t))
+                    memcpy(&eeprom_leaders[idx], pay, sizeof(eeprom_leader_t));
+                break;
+        }
+    } else if (cmd == 0x09) {  // SAVE (persist to EEPROM)
+        features_save_config();
     }
 }

@@ -111,25 +111,41 @@ lines.append('//  POS_xxx    = packed matrix position (used for tap-override bas
 lines.append('//  POS_IDX_xxx = LED index in g_snled27351_leds[] (used for IND_* macros)')
 lines.append('')
 
+# ── LED → matrix-position lookup array ─────────────────────────────────────
+# Keys without an RGB LED (e.g. rotary encoder) are excluded.
+led_layout = [e for e in layout if tuple(e['matrix']) not in no_led_positions]
+
+# Hardware wiring correction: on the Q2 ISO(-Encoder), the ISO Enter's
+# bottom cell (2, 12) is driven by the LAST channel of the bottom-row
+# driver group, so it is the LAST lit LED in g_snled27351_leds[] — even
+# though the layout array lists it before the Right arrow (4, 14).
+# Verified against keyboards/keychron/q2/iso/iso.c (the full 68-LED
+# array) vs iso_encoder.c (identical, minus the encoder entry at (0, 14)).
+ENTER_BOTTOM = (2, 12)
+led_layout = [e for e in led_layout if tuple(e['matrix']) != ENTER_BOTTOM] \
+           + [e for e in led_layout if tuple(e['matrix']) == ENTER_BOTTOM]
+
+# Real LED index per matrix position (lit keys only)
+led_index = {tuple(e['matrix']): i for i, e in enumerate(led_layout)}
+led_count = len(led_layout)
+
 seen = {}
-for i, (arg, entry) in enumerate(zip(args, layout)):
+for arg, entry in zip(args, layout):
     suffix = kc_to_macro_suffix(arg)
     if suffix is None:
         continue
     row, col = entry['matrix']
     if suffix in seen:
         continue
-    seen[suffix] = ((row << 8) | col, i)
+    seen[suffix] = (row << 8) | col
     lines.append(f'#define POS_{suffix}     PACK_MTX({row}, {col})  // {arg}')
-    lines.append(f'#define POS_IDX_{suffix} {i}                    // {arg}')
+    led = led_index.get((row, col))
+    if led is not None:
+        lines.append(f'#define POS_IDX_{suffix} {led}                    // {arg}')
     lines.append('')
 
-lines.append(f'// Total: {len(seen)} keys')
+lines.append(f'// Total: {len(seen)} keys, {led_count} with LEDs')
 
-# ── LED → matrix-position lookup array ─────────────────────────────────────
-# Keys without an RGB LED (e.g. rotary encoder) are excluded.
-led_layout = [e for e in layout if tuple(e['matrix']) not in no_led_positions]
-led_count = len(led_layout)
 lines.append('')
 lines.append('// ── LED-index → matrix-position lookup (for layer visualization) ──')
 lines.append(f'// {layout_count} layout entries, {led_count} with LEDs ({layout_count - led_count} skipped)')
