@@ -59,3 +59,7 @@ void layer_visualizer_cancel(void);
 /// Resume a locked overlay after overview exits.  No-op unless the lock
 /// is active and the feature is on.
 void layer_visualizer_resume(void);
+
+/// Trigger RGB feedback overlay: shows current RGB color for 1 second.
+/// Call from process_record_user when an RGB key is pressed.
+void rgb_feedback_trigger(void);

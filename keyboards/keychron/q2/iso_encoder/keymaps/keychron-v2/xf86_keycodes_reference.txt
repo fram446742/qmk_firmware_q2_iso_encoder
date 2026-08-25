@@ -1,0 +1,69 @@
+XF86 Keycode Reference - QMK HID Consumer Page Keycodes
+=========================================================
+
+This file lists all available QMK keycodes that map to XF86 media/system keys.
+
+These keycodes use the HID Consumer Page (usage page 0x0C) and work at the
+keyboard firmware level - no OS-specific drivers or configuration needed.
+
+Audio / Volume
+--------------
+KC_AUDIO_MUTE   (alias: KC_MUTE)           -> XF86AudioMute
+KC_AUDIO_VOL_UP (alias: KC_VOLU)           -> XF86AudioRaiseVolume
+KC_AUDIO_VOL_DOWN (alias: KC_VOLD)         -> XF86AudioLowerVolume
+KC_MEDIA_NEXT_TRACK (alias: KC_MNXT)     -> XF86AudioNext
+KC_MEDIA_PREV_TRACK (alias: KC_MPRV)       -> XF86AudioPrev
+KC_MEDIA_STOP (alias: KC_MSTP)             -> XF86AudioStop
+KC_MEDIA_PLAY_PAUSE (alias: KC_MPLY)       -> XF86AudioPlay / XF86AudioPause
+KC_MEDIA_FAST_FORWARD (alias: KC_MFFD)     -> XF86AudioForward
+KC_MEDIA_REWIND (alias: KC_MRWD)           -> XF86AudioRewind
+KC_MEDIA_SELECT (alias: KC_MSEL)           -> XF86AudioMedia
+KC_MEDIA_EJECT (alias: KC_EJCT)            -> XF86Eject
+
+Brightness
+----------
+KC_BRIGHTNESS_UP (alias: KC_BRIU)          -> XF86MonBrightnessUp
+KC_BRIGHTNESS_DOWN (alias: KC_BRID)        -> XF86MonBrightnessDown
+
+Mic Mute
+--------
+KC_MIC_MUTE    (custom keycode - see keymap_config.h) -> Mic Mute (Linux: Consumer Page 0x002F → KEY_MICMUTE)
+                                               Cross-platform mic mute via HID is NOT standardized.
+                                               Laptops (ASUS, Lenovo) achieve it through vendor-specific
+                                               drivers/composite USB devices, not standard HID.
+                                               Alternative: KC_F20 (mapped to mic mute on some Linux desktops)
+                                               or a macro with platform-specific shortcuts (Ctrl+Shift+M etc.)
+
+System / Application
+--------------------
+KC_SYSTEM_POWER                            -> XF86PowerOff
+KC_SYSTEM_SLEEP                            -> XF86Sleep
+KC_SYSTEM_WAKE                             -> XF86WakeUp
+KC_APPLICATION (alias: KC_APP)             -> XF86Menu / Menu
+KC_CONTROL_PANEL                           -> XF86Tools / ControlPanel
+KC_CALCULATOR (alias: KC_CALC)             -> XF86Calculator
+KC_MY_COMPUTER (alias: KC_MYCM)            -> XF86MyComputer
+KC_WWW_SEARCH (alias: KC_WSCH)             -> XF86Search
+KC_WWW_HOME (alias: KC_WHOM)               -> XF86HomePage
+KC_WWW_BACK (alias: KC_WBAK)               -> XF86Back
+KC_WWW_FORWARD (alias: KC_WFWD)            -> XF86Forward
+KC_WWW_STOP (alias: KC_WSTP)               -> XF86Stop
+KC_WWW_REFRESH (alias: KC_WREF)            -> XF86Refresh
+KC_WWW_FAVORITES (alias: KC_WFAV)          -> XF86Favorites
+
+Special (macOS / mobile)
+------------------------
+KC_MISSION_CONTROL                         -> XF86MissionControl
+KC_LAUNCHPAD                               -> XF86Launchpad
+KC_ASSISTANT                               -> XF86Assistant
+
+Notes:
+------
+- All consumer keycodes are in the range KC_AUDIO_MUTE (0x00A8) through
+  KC_LAUNCHPAD (0x00C2). QMK handles them automatically via host_consumer_send().
+- KC_MIC_MUTE is implemented as a custom keycode that sends Consumer Page
+  usage ID 0x00CC (Microphone Mute) directly via host_consumer_send().
+  This works cross-platform (Windows, Linux, macOS) because it uses the
+  standard HID Consumer Page protocol.
+- These keycodes are "keyboard-level" - they generate USB HID reports directly
+  from the firmware without requiring any OS-specific configuration.
