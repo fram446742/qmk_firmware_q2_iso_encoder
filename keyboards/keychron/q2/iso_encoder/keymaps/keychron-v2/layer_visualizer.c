@@ -141,6 +141,12 @@ static bool mo_release_pending = false;
 // enumeration, Launcher/VIA connect commands) never start a display.
 static bool user_activity = false;
 
+// RGB feedback: temporarily disable layer visualization for 1 second
+// so the user can see the actual RGB effect changes
+static bool     rgb_feedback_active = false;
+static uint32_t rgb_feedback_timer  = 0;
+#define RGB_FEEDBACK_DURATION_MS 1000
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -262,8 +268,29 @@ void layer_visualizer_task(void) {
         moment_active = false;
         mo_count = 0;
         mo_release_pending = false;
+        rgb_feedback_active = false;
         return;
     }
+    
+    // Cancel RGB feedback if layer visualization is no longer active
+    // (e.g., FN key was released during RGB feedback)
+    if (rgb_feedback_active && !moment_active && !perm_active) {
+        rgb_feedback_active = false;
+    }
+    
+    // RGB feedback timeout
+    if (rgb_feedback_active) {
+        if (timer_elapsed32(rgb_feedback_timer) > RGB_FEEDBACK_DURATION_MS) {
+            rgb_feedback_active = false;
+            // Restore layer visualization if it's currently active
+            // (moment_active or perm_active might have changed during RGB feedback)
+            if ((perm_active || moment_active) && feature_layer_vis()) {
+                start_perm_display(get_highest_layer(layer_state));
+            }
+        }
+        return;
+    }
+    
     if (moment_active)          return;
     if (!perm_active)           return;
     if (vis_locked)             return;  // locked: no auto-hide
@@ -331,6 +358,22 @@ bool layer_visualizer_is_locked(void) {
     return vis_locked && feature_layer_vis();
 }
 
+void rgb_feedback_trigger(void) {
+    if (!feature_layer_vis()) return;
+    
+    // Just activate RGB feedback mode - don't modify perm_active or moment_active
+    // This allows normal state tracking (e.g., FN key release) to work correctly
+    rgb_feedback_active = true;
+    rgb_feedback_timer  = timer_read32();
+}
+
+static void rgb_feedback_draw(void) {
+    // Do nothing - let the RGB effect run normally without overlay
+    // The layer visualization is disabled, so the effect is visible
+    (void)0;
+}
+
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Drawing
@@ -356,6 +399,12 @@ static void draw_layer(uint8_t layer) {
 }
 
 void layer_visualizer_draw(void) {
+    // RGB feedback takes priority
+    if (rgb_feedback_active) {
+        rgb_feedback_draw();
+        return;
+    }
+    
     if (moment_active) {
         // During MO holds, always read QMK's live layer state.
         uint8_t live = get_highest_layer(layer_state);

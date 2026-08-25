@@ -121,11 +121,14 @@ void kc_raw_hid_send(uint8_t *data, uint8_t len) {
 }
 
 bool kc_raw_hid_rx(uint8_t *data, uint8_t length) {
-    // Detect Keychron Launcher (0xA0-0xAB) vs VIA/Vial (0x01-0x0E)
+    // Detect Keychron Launcher (0xA0-0xAB) vs VIA/Vial (0x01-0x0E).
+    // Once the Launcher is detected, keep it active — the Launcher uses
+    // both its own commands (0xA0-0xAB) AND standard VIA commands
+    // (0x04/0x05 for dynamic keymap get/set) for key remapping.
+    // Deactivating on VIA commands would break layer notifications
+    // every time the user remaps a key.
     if (data[0] >= 0xA0 && data[0] <= 0xAB) {
         keychron_notify_set_active(true);
-    } else if (data[0] <= 0x0F) {
-        keychron_notify_set_active(false);
     }
 
 #    if defined(ANANLOG_MATRIX) && defined(VIA_ENABLE)

@@ -279,7 +279,6 @@ enum layers {
 enum feature_keycodes {
     KC_FEAT_OVERVIEW = NEW_SAFE_RANGE,
 };
-
 enum combo_events {
     CB_FEAT_OVERVIEW,
 };
