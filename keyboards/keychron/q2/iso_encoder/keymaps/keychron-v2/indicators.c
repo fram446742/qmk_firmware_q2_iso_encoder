@@ -7,6 +7,7 @@
 #include "features.h"
 #include "keymap_config.h"
 #include "layer_visualizer.h"
+#include "rgb_matrix_drivers.h"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Overview state
@@ -138,17 +139,44 @@ void feature_overview_handle_key(keyrecord_t *record) {
 // Per-frame drawing
 // ═════════════════════════════════════════════════════════════════════════════
 
-void indicator_draw(void) {
-    if (!overview_active) return;
+void indicator_draw(uint8_t led_min, uint8_t led_max) {
+    // All indicators use rgb_matrix_driver.set_color (advanced callback),
+    // the same API that makes caps lock persist through the RGB effect and
+    // show in Keychron Launcher.  Called from rgb_matrix_indicators_advanced_user
+    // with the full LED range — each set_color writes to the overlay buffer.
+    //
+    // Sleep/suspend: when RGB matrix is disabled, skip overlay so the
+    // driver stays dark (matches q2.c caps lock behavior).
+    if (!rgb_matrix_is_enabled()) return;
 
-    rgb_matrix_set_color_all(0, 0, 0);
+    if (!overview_active) {
+        // ── Persistent indicators (normal mode) ─────────────────────
+        // Overlaid on top of the running RGB effect via the indicator
+        // overlay buffer — survives the effect cycle, just like caps.
+        if (rgb_matrix_get_flags() == 0) {
+            // LEDs flagged as "none" — no indicator overrides
+            return;
+        }
+        if (keymap_config.no_gui) {
+            rgb_matrix_driver.set_color(IND_WIN_LOCK_HOST, 255, 0, 0);
+        }
+        if (host_keyboard_led_state().scroll_lock) {
+            rgb_matrix_driver.set_color(IND_SCROLL_HOST, 255, 255, 255);
+        }
+        return;
+    }
 
-    // ── Active-layer indicator ──────────────────────────────────────────
+    // ── Overview mode: clear all and draw indicator grid ──────────────
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        rgb_matrix_driver.set_color(i, 0, 0, 0);
+    }
+
+    // Active-layer indicator (white)
     uint8_t led = indicator_led_for_layer();
     if (led < RGB_MATRIX_LED_COUNT)
-        rgb_matrix_set_color(led, 255, 255, 255);
+        rgb_matrix_driver.set_color(led, 255, 255, 255);
 
-    // ── Feature indicators (active=white, inactive=red) ────────────────
+    // Feature indicators (active=white, inactive=red)
     typedef struct { uint8_t led; bool active; } ind_t;
     ind_t list[] = {
         { IND_AUTO_SHIFT,  feature_auto_shift()                       },
@@ -160,18 +188,25 @@ void indicator_draw(void) {
         { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
         { IND_NKRO,        keymap_config.nkro                         },
         { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
+        { IND_WIN_LOCK_HOST,    keymap_config.no_gui                       },
+        { IND_SCROLL_HOST, host_keyboard_led_state().scroll_lock      },
     };
     for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
-        rgb_matrix_set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
+        rgb_matrix_driver.set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
     }
 }
-
 // ═════════════════════════════════════════════════════════════════════════════
 // Per-loop timeout check
 // ═════════════════════════════════════════════════════════════════════════════
 
 void indicator_task(void) {
-    if (overview_active && timer_elapsed32(overview_start) > OVERVIEW_TIMEOUT_MS) {
+    if (!overview_active) return;
+    // When layer-visualization is locked (9 key / 10th indicator), the
+    // overview is considered "permanent" — don't auto-exit.  This matches
+    // the user's expectation that the permanent mode stays until explicitly
+    // toggled off.  While locked, the timer is paused.
+    if (layer_visualizer_is_locked()) return;
+    if (timer_elapsed32(overview_start) > OVERVIEW_TIMEOUT_MS) {
         feature_overview_cancel();
     }
 }

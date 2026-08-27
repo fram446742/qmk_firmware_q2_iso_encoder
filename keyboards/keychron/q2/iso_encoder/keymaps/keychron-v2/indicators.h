@@ -28,5 +28,5 @@ uint8_t layer_to_led(uint8_t layer);
 /// Returns the LED index for the active (non-default) layer indicator.
 uint8_t indicator_led_for_layer(void);
 
-void indicator_draw(void);
+void indicator_draw(uint8_t led_min, uint8_t led_max);
 void indicator_task(void);

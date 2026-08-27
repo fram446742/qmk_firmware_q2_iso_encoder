@@ -90,17 +90,17 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [WIN_FN1] = LAYOUT_iso_68(
         KC_GRV,   KC_BRID,  KC_BRIU,  KC_TASK,  KC_FILE,  UG_VALD,  UG_VALU,  KC_MPRV,  KC_MPLY,  KC_MNXT,  KC_MUTE,  KC_VOLD,  KC_VOLU,  _______,            KC_F20,
-        UG_TOGG,  UG_NEXT,  UG_VALU,  UG_HUEU,  UG_SATU,  UG_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      _______,
-        _______,  UG_PREV,  UG_VALD,  UG_HUED,  UG_SATD,  UG_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
+        UG_TOGG,  UG_NEXT,  _______,  UG_VALU,  _______,  _______,  UG_HUEU,  _______,  _______,  UG_SATU,  _______,  UG_SPDU,  _______,                      _______,
+        _______,  UG_PREV,  _______,  UG_VALD,  _______,  _______,  UG_HUED,  _______,  _______,  UG_SATD,  _______,  UG_SPDD,  _______,  _______,            _______,
         _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  _______,
-        _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,  _______,  _______),
+        _______,  _______,  _______,                                UG_TOGG,                                _______,  _______,  _______,  _______,  _______,  _______),
 
     [_FN2] = LAYOUT_iso_68(
         KC_TILD,  KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,   KC_F12,   _______,            _______,
-        QK_LEAD,  UG_NEXT,  UG_VALU,  UG_HUEU,  UG_SATU,  UG_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      _______,
-        _______,  UG_PREV,  UG_VALD,  UG_HUED,  UG_SATD,  UG_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
-        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  _______,
-        _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,  _______,  _______),
+        QK_LEAD,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      KC_INS,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            KC_PSCR,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  KC_PGUP,
+        _______,  QK_MAGIC_TOGGLE_GUI,  _______,                                _______,                                _______,  _______,  _______,  KC_HOME,  KC_PGDN,  KC_END),
 
     [_FN3] = LAYOUT_iso_68(
         QK_GESC,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
@@ -266,20 +266,20 @@ void matrix_scan_user(void) {
 }
 
 #if defined(RGB_MATRIX_ENABLE)
-bool rgb_matrix_indicators_user(void) {
-    indicator_draw();
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    indicator_draw(led_min, led_max);
 
     if (feature_overview_is_active()) {
         // Overview screen: indicator LEDs only (drawn by indicator_draw).
         // The layer-visualization overlay — including the lock — is
         // suspended while overview is open; a locked overlay resumes on
         // exit via layer_visualizer_resume().
-        return false;
+        return true;  // let caps lock (q2.c) draw on top
     }
 
     if (layer_visualizer_is_active()) {
         layer_visualizer_draw();
-        return false;
+        return true;  // let caps lock (q2.c) draw on top
     }
 
     return true;
