@@ -7,6 +7,7 @@
 #include "eeprom.h"
 #include "send_string.h"
 #include "unicode.h"
+#include "dynamic_keymap.h"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // All configuration constants (TAP_TERM, MAX_*, EEP_*, defaults, etc.) are
@@ -268,7 +269,16 @@ void features_combo_task(void) {
                 // Re-play each held key as a single tap
                 for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
                     if (pos_cb_state[ci].down & (1 << ki)) {
-                        tap_code16(pos_combos[ci].keys[ki]);
+                        // Position combos store PACK_MTX(r,c), not keycodes.
+                        // Look up the actual keycode from the dynamic keymap
+                        // so the replayed key is correct for the current layer.
+                        uint16_t mtx = pos_combos[ci].keys[ki];
+                        uint8_t row = (mtx >> 8) & 0xFF;
+                        uint8_t col = mtx & 0xFF;
+                        uint16_t kc = dynamic_keymap_get_keycode(
+                            get_highest_layer(layer_state), row, col);
+                        if (kc == KC_TRNS) kc = KC_NO;
+                        tap_code16(kc);
                     }
                 }
                 pos_cb_state[ci].down  = 0;

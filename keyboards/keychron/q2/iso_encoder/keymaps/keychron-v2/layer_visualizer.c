@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H
 #include "keychron_common.h"
 #include "layer_visualizer.h"
+#include "rgb_matrix_drivers.h"
 #include "keymap_config.h"
 #include "features.h"
 #include "indicators.h"
@@ -207,6 +208,18 @@ static void start_perm_display(uint8_t layer) {
 void layer_visualizer_trigger(layer_state_t state) {
     if (!feature_layer_vis()) return;
 
+    // Always track the highest layer so perm display shows the correct
+    // layer when it starts — even if we suppress the display below.
+    vis_layer = get_highest_layer(state);
+
+    // While feature overview is open, layer changes (number-row taps
+    // inside overview) should not start a hidden perm display that would
+    // timeout before the overview exits.  The overview already shows the
+    // active layer via indicator_led_for_layer(); the layer-vis overlay
+    // will be (re)started on overview exit via layer_visualizer_resume()
+    // if vis_locked is set, or on the next non-overview layer change.
+    if (feature_overview_is_active()) return;
+
     // Suppress everything until the initial default-layer sync completes
     // (first matrix scan).
     if (!boot_done) return;
@@ -338,17 +351,34 @@ void layer_visualizer_lock_toggle(void) {
         // the live layer and the release path starts the locked display.
         if (!moment_active && !feature_overview_is_active()) {
             start_perm_display(get_highest_layer(layer_state));
+        } else if (feature_overview_is_active()) {
+            // While overview is open the timer is paused (indicator_task
+            // returns early when vis_locked).  Reset it so the permanent
+            // overview gets a fresh timeout window and doesn't immediately
+            // expire from an old overview_start value.
+            feature_overview_reset_timer();
+            // Also refresh perm timer for when overview exits.
+            perm_start = timer_read32();
         }
     } else {
-        // Unlock: drop the overlay.  During an MO hold the live moment
-        // display continues; the release path now skips the permanent
-        // display since the lock is off.
+        // Unlock: drop the permanent overlay and ensure both timers are
+        // reset so the UI returns to normal after the standard timeouts.
+        // During an MO hold the live moment display continues; the release
+        // path now skips the permanent display since the lock is off.
         if (!moment_active) {
             perm_active = false;
         }
+        // Reset timers so deactivation doesn't inherit an already-expired
+        // value and "never goes back to normal".  Overview was paused while
+        // locked, so its elapsed is stale — refresh it to start a fresh
+        // OVERVIEW_TIMEOUT_MS countdown that will restore the saved RGB
+        // mode.  Likewise refresh perm timer for normal layer-vis timeout.
+        perm_start = timer_read32();
+        if (feature_overview_is_active()) {
+            feature_overview_reset_timer();
+        }
     }
 }
-
 bool layer_visualizer_is_active(void) {
     if (!feature_layer_vis()) return false;
     return perm_active || moment_active;
@@ -391,7 +421,7 @@ static void draw_layer(uint8_t layer) {
         uint8_t  col  = mtx & 0xFF;
         uint16_t kc   = dynamic_keymap_get_keycode(layer, row, col);
         key_category_t cat = categorize(kc);
-        rgb_matrix_set_color(led,
+        rgb_matrix_driver.set_color(led,
                              pgm_read_byte(&cat_colors[cat][0]),
                              pgm_read_byte(&cat_colors[cat][1]),
                              pgm_read_byte(&cat_colors[cat][2]));

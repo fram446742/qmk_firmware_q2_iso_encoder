@@ -332,6 +332,12 @@ enum combo_events {
 // of each key.  During normal operation only CAPS_LOCK lights; the others
 // illuminate in overview mode.
 //
+// IMPORTANT: All IND_* are physical positions (POS_IDX_KC_xxx), not mapped
+// keycode lookups.  The LED follows the physical key even if the user
+// remaps the keycode on another layer via VIA/Launcher.  Caps Lock is the
+// canonical example: POS_IDX_KC_CAPS (LED 28 on iso_encoder) always shows
+// host caps state, not wherever KC_CAPS happens to be mapped.
+//
 //  Key   Purpose
 //  ───   ──────────────────────────
 //  Caps  Hardware Caps Lock state (handled by keychron_rgb.c, not here)
@@ -357,6 +363,14 @@ enum combo_events {
 // Layer-visualization lock indicator (the "9" key)
 #define IND_VIS_LOCK    POS_IDX_KC_9
 
+// ── Persistent host indicators (always drawn, physical positions) ─────────
+// These complement the Caps Lock indicator in q2.c (CAPS_LOCK_INDEX = 28 =
+// POS_IDX_KC_CAPS).  Like caps, they use physical LED indices so remapping
+// the keycode does not move the indicator.  Add more entries here and wire
+// them in indicators.c:indicator_draw() persistent section.
+#define IND_CAPS_HOST   POS_IDX_KC_CAPS   // physical Caps key — host caps_lock
+#define IND_WIN_LOCK_HOST    POS_IDX_KC_LOPTN  // physical Left GUI/CMD — Win/GUI lock (no_gui)
+#define IND_SCROLL_HOST POS_IDX_KC_DEL    // physical Del — host scroll_lock (example)
 // ═════════════════════════════════════════════════════════════════════════════
 // LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows
 // ═════════════════════════════════════════════════════════════════════════════

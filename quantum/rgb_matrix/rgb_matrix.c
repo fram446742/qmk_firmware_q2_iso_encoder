@@ -364,6 +364,13 @@ static void rgb_task_start(void) {
 static void rgb_task_render(uint8_t effect) {
     bool rendering         = false;
     rgb_effect_params.init = (effect != rgb_last_effect) || (rgb_matrix_config.enable != rgb_last_enable);
+    if (rgb_effect_params.init) {
+        // Clear stale LED buffer on every effect/mode change so the previous
+        // effect's pixels never leak into the new one (ghost traces).  This is
+        // cheaper than requiring every effect's init path to set every LED to
+        // black and fixes reactive / sparse effects that only touch a subset.
+        rgb_matrix_set_color_all(0, 0, 0);
+    }
     if (rgb_effect_params.flags != rgb_matrix_config.flags) {
         rgb_effect_params.flags = rgb_matrix_config.flags;
         rgb_matrix_set_color_all(0, 0, 0);
