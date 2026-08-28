@@ -168,9 +168,11 @@ void features_tap_task(void) {
 // ═════════════════════════════════════════════════════════════════════════════
 //
 // Handles combos defined with matrix positions (POS_KC_xxx) so they work
-// on any layer.  Processed in process_record_user BEFORE QMK's native
-// process_combo — position combos are consumed here; keycode combos fall
-// through to QMK.
+// on any layer regardless of the keycode at that position.  QMK's native
+// process_combo() runs first (from pre_process_record_quantum, before
+// process_record_user) and consumes any keys it matches by keycode; this
+// processor is the fallback for position combos on keys the native system
+// doesn't claim (e.g. after the key is remapped in VIA/Launcher).
 //
 // QMK's native combo system (key_combos[] in combos.c) only matches on
 // KC_xxx keycodes.  This processor adds a second path that matches on
@@ -218,10 +220,22 @@ bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
             pos_cb_state[ci].down |= bit;
 
             if (pos_cb_state[ci].down == (uint8_t)((1 << cb->key_count) - 1)) {
-                // All keys now held — fire the combo
+                // All keys now held — fire the combo.
                 pos_cb_state[ci].fired = true;
                 pos_cb_state[ci].down  = 0;
-                tap_code16(cb->output);
+                // Route the output through the normal key-processing pipeline
+                // instead of tap_code16().  tap_code16() bypasses
+                // process_record_user, so a custom keycode (KC_FEAT_OVERVIEW
+                // == NEW_SAFE_RANGE, in the QK_KB range) gets truncated to its
+                // low byte and sent as a spurious raw HID key.  A synthetic
+                // combo event through process_record() reaches the keymap's
+                // process_record_user() handler, where the switch dispatches
+                // the custom keycode.
+                keyrecord_t combo_record = {
+                    .event   = MAKE_COMBOEVENT(true),
+                    .keycode = cb->output,
+                };
+                process_record(&combo_record);
                 return false;
             }
 
