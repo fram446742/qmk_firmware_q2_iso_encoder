@@ -11,9 +11,8 @@
  * COMBO_END, NEW_SAFE_RANGE, etc.)  Do NOT include from config.h — that
  * file is processed before QMK headers are available.
  *
- * The Python tool (qmk_config_tool.py) reads features.h for HID protocol
- * constants (VALUE_*, EEP_*).  Keep features.h in sync or point the
- * Python tool at this file instead.
+ * The Python tool (qmk_config_tool.py) reads this file for HID protocol
+ * constants (VALUE_*, EEP_*, EEPROM structs, defaults).
  */
 
 #pragma once
@@ -369,7 +368,7 @@ enum combo_events {
 // the keycode does not move the indicator.  Add more entries here and wire
 // them in indicators.c:indicator_draw() persistent section.
 #define IND_CAPS_HOST   POS_IDX_KC_CAPS   // physical Caps key — host caps_lock
-#define IND_WIN_LOCK_HOST    POS_IDX_KC_LOPTN  // physical Left GUI/CMD — Win/GUI lock (no_gui)
+#define IND_WIN_LOCK_HOST    POS_IDX_KC_LOPTN  // physical Left Option (Win key on Windows) — GUI lock
 #define IND_SCROLL_HOST POS_IDX_KC_DEL    // physical Del — host scroll_lock (example)
 // ═════════════════════════════════════════════════════════════════════════════
 // LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows
