@@ -138,7 +138,10 @@ typedef struct __attribute__((packed)) {
 // POSITION-BASED COMBO  —  custom processor, not QMK's native combo system
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// Processed in features_combo_process() before QMK's native process_combo.
+// Processed in features_combo_process() as a fallback — QMK's native
+// process_combo() runs first (in pre_process_record_quantum) and consumes
+// combo keys it matches by keycode; this processor catches position combos
+// the native system doesn't claim.
 // Supports both keycode matching (base_type=0) and matrix-position matching
 // (base_type=1, using PACK_MTX/ POS_KC_xxx values).  Position-based combos
 // follow the physical key regardless of what keycode is on the current layer.

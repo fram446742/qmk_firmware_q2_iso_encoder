@@ -169,8 +169,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         if (!features_tap_process(keycode, record)) return false;
     }
 
-    // ── Position-based combo processor (before overview, before QMK) ───
-    // Catches chords like O+P by matrix position so they work on any layer.
+    // ── Position-based combo processor (fallback, after QMK's native combo) ──
+    // Catches chords like O+[ by matrix position so they work on any layer.
     if (!features_combo_process(keycode, record)) return false;
 
     // ── Interactive overview mode ───────────────────────────────────────

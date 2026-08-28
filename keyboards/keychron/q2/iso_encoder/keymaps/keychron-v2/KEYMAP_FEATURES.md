@@ -140,14 +140,14 @@ checks which physical key was pressed, not which keycode it sends.
     POS_COMBO(2, BASE_IS_MATRIX, KC_FEAT_OVERVIEW, POS_KC_O, POS_KC_LBRC),
 ```
 
-Position combos are processed **in `process_record_user()` before** QMK's
-native `process_combo()` runs.  If the positions match, the keys are
-consumed and don't reach QMK's combo system.  This means:
-- On layers where O+[ have the same physical keys (all base/FN layers):
-  position combo fires, QMK combo is irrelevant (keys already consumed)
-- On layers where those positions send different keycodes: position combo
-  still fires, QMK combo would also fire if it matched those keycodes
-  (but it won't, since the keys were already consumed)
+QMK's native `process_combo()` runs **first** (from
+`pre_process_record_quantum`, before `process_record_user()`).  It consumes
+`O + [` wherever those keys resolve to `KC_O`/`KC_LBRC` — including
+transparent FN layers, where `KC_TRNS` falls through to the base layer.  The
+position-based processor is the **fallback**: it only sees the keys when the
+native combo does not claim them (i.e. after `O` or `[` is remapped to a
+non-`KC_O`/`KC_LBRC` keycode in VIA/Launcher), and it fires the combo by
+physical position regardless of keycode.
 
 ### Adding a new combo
 
@@ -172,8 +172,9 @@ physical key), use `BASE_IS_KEYCODE` instead:
 
 ## Feature Overview (interactive mode)
 
-Press `O + [` simultaneously to enter.  Uses the **position-based combo**
-(see above) — works on any layer.  LEDs go dark, indicator keys light up
+Press `O + [` simultaneously to enter.  Handled by the native combo on stock
+layers and by the position-based combo when the keys are remapped (see
+above) — works on any layer.  LEDs go dark, indicator keys light up
 white=ON, red=OFF.
 
 | Press | Action |

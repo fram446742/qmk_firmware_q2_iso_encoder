@@ -21,13 +21,14 @@
 //     positions (POS_KC_xxx / PACK_MTX), controlled by base_type.
 //     Use for position-based combos that work on any layer.
 //
-//     The feature-overview combo (O+P) is defined in BOTH systems:
-//     - QMK-native: matches O+P by keycode (KC_O + KC_LBRC)
-//     - Position:   matches O+P by physical key (POS_KC_O + POS_KC_LBRC)
-//     The position-based path runs first in process_record_user and
-//     consumes the keys if the positions match, so it wins on any layer.
-//     On layers where O and LBRC don't exist, the QMK-native path won't
-//     fire (no false positive — no side-effect from the fallthrough).
+//     The feature-overview combo (O+[) is defined in BOTH systems:
+//     - QMK-native: matches O+[ by keycode (KC_O + KC_LBRC)
+//     - Position:   matches O+[ by physical key (POS_KC_O + POS_KC_LBRC)
+//     QMK's native process_combo() runs first (in pre_process_record_quantum,
+//     before process_record_user) and consumes O+[ wherever the keys resolve
+//     to KC_O/KC_LBRC — including transparent FN layers.  The position-based
+//     path is the fallback that fires when the keys are remapped in
+//     VIA/Launcher so the native combo no longer matches them by keycode.
 // ═════════════════════════════════════════════════════════════════════════════
 
 const uint16_t PROGMEM cb_feat_overview[] = COMBO_FEAT_OVERVIEW_KEYS;

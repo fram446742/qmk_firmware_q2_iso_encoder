@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Feature overview  —  interactive mode toggled by O+P combo
+// Feature overview  —  interactive mode toggled by O+[ combo
 // ═════════════════════════════════════════════════════════════════════════════
 // LED indices and timeouts are defined in keymap_config.h.
 
