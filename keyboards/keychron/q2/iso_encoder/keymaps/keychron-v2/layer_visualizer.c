@@ -33,9 +33,11 @@ typedef enum {
     CAT_LAYER,       // MO, TO, TG, DF, LT, MT, etc.
 } key_category_t;
 
-// ── Mac-specific QK_KB range ───────────────────────────────────────────────
-// KC_LOPTN (QK_KB_2 = 0x7E02) through KC_MAC_SIRI (QK_KB_6 = 0x7E06).
-#define IS_MAC_EXTRA(kc)  ((kc) >= KC_LOPTN && (kc) <= KC_MAC_SIRI)
+// ── Mac modifier keys (QK_KB range) ────────────────────────────────────────
+// KC_LOPTN (QK_KB_0) through KC_RCMMD (QK_KB_3) — the four Option/Cmd keys.
+// Keychron's other QK_KB keys (KC_TASK, KC_FILE, KC_SNAP, KC_CTANA, KC_SIRI,
+// KC_MAC_MISSION_CONTROL, KC_MAC_LAUCHPAD, …) fall through to CAT_SPECIAL.
+#define IS_MAC_EXTRA(kc)  ((kc) >= KC_LOPTN && (kc) <= KC_RCMMD)
 
 // ── Function keys ──────────────────────────────────────────────────────────
 #define IS_F_KEY(kc)      (((kc) >= KC_F1 && (kc) <= KC_F12) || ((kc) >= KC_F13 && (kc) <= KC_F24))
@@ -367,14 +369,6 @@ void rgb_feedback_trigger(void) {
     rgb_feedback_timer  = timer_read32();
 }
 
-static void rgb_feedback_draw(void) {
-    // Do nothing - let the RGB effect run normally without overlay
-    // The layer visualization is disabled, so the effect is visible
-    (void)0;
-}
-
-
-
 // ═════════════════════════════════════════════════════════════════════════════
 // Drawing
 // ═════════════════════════════════════════════════════════════════════════════
@@ -399,12 +393,12 @@ static void draw_layer(uint8_t layer) {
 }
 
 void layer_visualizer_draw(void) {
-    // RGB feedback takes priority
+    // RGB feedback takes priority: suppress the overlay so the effect is
+    // visible while the feedback window is active.
     if (rgb_feedback_active) {
-        rgb_feedback_draw();
         return;
     }
-    
+
     if (moment_active) {
         // During MO holds, always read QMK's live layer state.
         uint8_t live = get_highest_layer(layer_state);
