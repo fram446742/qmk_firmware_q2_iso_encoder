@@ -8,6 +8,11 @@
 #include "keymap_config.h"
 #include "layer_visualizer.h"
 #include "rgb_matrix_drivers.h"
+#include "keychron_rgb_type.h"
+
+// Launcher indicator config (disable flags + HSV).  Defined in the vendor's
+// keychron_rgb.c; referenced here for the caps-lock toggle.
+extern os_indicator_config_t os_ind_cfg;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Overview state
@@ -139,32 +144,30 @@ void feature_overview_handle_key(keyrecord_t *record) {
 // Per-frame drawing
 // ═════════════════════════════════════════════════════════════════════════════
 
+#if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
+// ── Caps Lock (persistent) ─────────────────────────────────────────────────
+// The vendor's os_state_indicate() only draws the lock LEDs when no RGB
+// effect is running; this runs on every frame so the Launcher's caps-lock
+// enable/disable toggle is honored while an effect is active.  Moved here
+// from q2.c so the keyboard file stays byte-identical to the vendor.
+static void caps_lock_indicate(uint8_t led_min, uint8_t led_max) {
+    if (os_ind_cfg.disable.caps_lock) return;
+
+    if (host_keyboard_led_state().caps_lock) {
+        RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 255, 255, 255);
+    } else if (!rgb_matrix_get_flags()) {
+        RGB_MATRIX_INDICATOR_SET_COLOR(CAPS_LOCK_INDEX, 0, 0, 0);
+    }
+}
+#endif
+
 void indicator_draw(uint8_t led_min, uint8_t led_max) {
-    // All indicators use rgb_matrix_driver.set_color (advanced callback),
-    // the same API that makes caps lock persist through the RGB effect and
-    // show in Keychron Launcher.  Called from rgb_matrix_indicators_advanced_user
-    // with the full LED range — each set_color writes to the overlay buffer.
-    //
-    // Sleep/suspend: when RGB matrix is disabled, skip overlay so the
-    // driver stays dark (matches q2.c caps lock behavior).
+    // Caps/Num/Win Lock are drawn by os_state_indicate() in keychron_rgb.c;
+    // this callback draws the caps-lock override + the interactive overview
+    // grid (overview only).
     if (!rgb_matrix_is_enabled()) return;
 
-    if (!overview_active) {
-        // ── Persistent indicators (normal mode) ─────────────────────
-        // Overlaid on top of the running RGB effect via the indicator
-        // overlay buffer — survives the effect cycle, just like caps.
-        if (rgb_matrix_get_flags() == 0) {
-            // LEDs flagged as "none" — no indicator overrides
-            return;
-        }
-        if (keymap_config.no_gui) {
-            rgb_matrix_driver.set_color(IND_WIN_LOCK_HOST, 255, 0, 0);
-        }
-        if (host_keyboard_led_state().scroll_lock) {
-            rgb_matrix_driver.set_color(IND_SCROLL_HOST, 255, 255, 255);
-        }
-        return;
-    }
+    if (overview_active) {
 
     // ── Overview mode: clear all and draw indicator grid ──────────────
     for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
@@ -188,14 +191,17 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
         { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
         { IND_NKRO,        keymap_config.nkro                         },
         { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
-        { IND_WIN_LOCK_HOST,    keymap_config.no_gui                       },
-        { IND_SCROLL_HOST, host_keyboard_led_state().scroll_lock      },
     };
     for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
         rgb_matrix_driver.set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
     }
+    }  // if (overview_active)
+
+    // Caps Lock is drawn last so it stays visible over the overview grid.
+#if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
+    caps_lock_indicate(led_min, led_max);
+#endif
 }
-// ═════════════════════════════════════════════════════════════════════════════
 // Per-loop timeout check
 // ═════════════════════════════════════════════════════════════════════════════
 

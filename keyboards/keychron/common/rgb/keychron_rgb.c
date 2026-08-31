@@ -90,7 +90,6 @@ void eeconfig_reset_custom_rgb(void) {
 
     memcpy(regions, default_region, RGB_MATRIX_LED_COUNT);
     eeprom_update_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
-
     memcpy(rgb_regions, default_region, RGB_MATRIX_LED_COUNT);
     for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
         g_led_config.flags[i] = (g_led_config.flags[i] & 0x0F) | (default_region[i] << 4);
@@ -140,13 +139,13 @@ void eeconfig_init_custom_rgb(void) {
             eeprom_update_block(regions, OFFSET_LAYER_FLAGS, sizeof(regions));
         }
     }
-    eeprom_read_block(effect_list, OFFSET_EFFECT_LIST, sizeof(effect_list));
     /* rgb_regions[] is NOT mirrored from regions[] here — it stays at
      * BSS zeros so every effect that goes through
      * rgb_matrix_region_set_color(0, i, …) matches all LEDs.
      * The explicit memset ensures this even if some other code path
      * wrote to rgb_regions[] before keyboard_post_init completed. */
     memset(rgb_regions, 0, sizeof(rgb_regions));
+    eeprom_read_block(effect_list, OFFSET_EFFECT_LIST, sizeof(effect_list));
     update_mixed_rgb_effect_count();
 }
 
@@ -514,6 +513,7 @@ void os_state_indicate(void) {
 void rgb_matrix_none_indicators(void) {
     os_state_indicate();
 }
+
 bool process_record_keychron_rgb(uint16_t keycode, keyrecord_t *record) {
     if ((rgb_matrix_get_mode() == RGB_MATRIX_CUSTOM_MIXED_RGB || rgb_matrix_get_mode() == RGB_MATRIX_CUSTOM_PER_KEY_RGB) && record->event.pressed) {
         switch (keycode) {
