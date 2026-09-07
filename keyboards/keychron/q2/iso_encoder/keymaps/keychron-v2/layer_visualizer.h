@@ -27,6 +27,18 @@ void layer_visualizer_momentary_release(uint16_t mtx_pos);
 bool layer_visualizer_is_active(void);
 void layer_visualizer_task(void);
 void layer_visualizer_draw(void);
+/// Call from rgb_matrix_indicators_advanced_user every frame, before the
+/// indicators are drawn.  Clears stale overlay colors once when the overlay
+/// stops being shown.
+void layer_visualizer_frame(void);
+
+/// Write one LED into the overlay buffer (shared with feature overview).
+/// Skips unchanged pixels and marks the overlay dirty only on real changes.
+void overlay_set_color(uint8_t led, uint8_t r, uint8_t g, uint8_t b);
+
+/// Clear the whole overlay buffer (all LEDs black).
+void overlay_clear_all(void);
+
 
 /// Call from matrix_scan_user after the initial default-layer sync.
 /// Enables triggers (the initial sync itself is suppressed).

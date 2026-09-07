@@ -70,6 +70,28 @@ snled27351_driver_t driver_buffers[SNLED27351_DRIVER_COUNT] = {{
     .led_control_buffer_dirty = false,
 }};
 
+// Optional flush override: when non-NULL, the flush sends this buffer instead
+// of the driver's pwm_buffer.  The buffer holds SNLED27351_DRIVER_COUNT
+// contiguous pwm_buffer-sized blocks (one per driver).  Lets an external
+// overlay (layer visualization) display its own colors without clobbering the
+// effect's persistent per-key state, which lazy effects (jellybean raindrops,
+// pixel rain) store directly in the pwm_buffer.
+const uint8_t *snled27351_flush_override = NULL;
+
+// One-shot: set to true to force the next flush to send the driver's pwm_buffer
+// even if it isn't dirty.  Cleared by snled27351_flush().  Used to repaint the
+// effect's buffer when the overlay is removed (the effect may not have written
+// since, leaving its pwm_buffer clean while the hardware still shows the
+// overlay).
+bool snled27351_force_flush = false;
+
+// Dirty flag for the flush override buffer.  Set by the overlay writer whenever
+// it changes a pixel; cleared by snled27351_flush().  While the overlay is
+// showing the effect's pwm_buffer is not displayed, so the flush keys off THIS
+// flag instead of pwm_buffer_dirty — that avoids an I2C write every frame when
+// the overlay content is static.
+bool snled27351_overlay_dirty = false;
+
 void snled27351_write_register(uint8_t index, uint8_t reg, uint8_t data) {
 #if SNLED27351_I2C_PERSISTENCE > 0
     for (uint8_t i = 0; i < SNLED27351_I2C_PERSISTENCE; i++) {
@@ -84,7 +106,7 @@ void snled27351_select_page(uint8_t index, uint8_t page) {
     snled27351_write_register(index, SNLED27351_REG_COMMAND, page);
 }
 
-void snled27351_write_pwm_buffer(uint8_t index) {
+void snled27351_write_pwm_buffer(uint8_t index, const uint8_t *buffer) {
     // Assumes PG1 is already selected.
     // Transmit PWM registers in 12 transfers of 16 bytes.
 
@@ -92,10 +114,10 @@ void snled27351_write_pwm_buffer(uint8_t index) {
     for (uint8_t i = 0; i < SNLED27351_PWM_REGISTER_COUNT; i += 16) {
 #if SNLED27351_I2C_PERSISTENCE > 0
         for (uint8_t j = 0; j < SNLED27351_I2C_PERSISTENCE; j++) {
-            if (i2c_write_register(i2c_addresses[index] << 1, i, driver_buffers[index].pwm_buffer + i, 16, SNLED27351_I2C_TIMEOUT) == I2C_STATUS_SUCCESS) break;
+            if (i2c_write_register(i2c_addresses[index] << 1, i, buffer + i, 16, SNLED27351_I2C_TIMEOUT) == I2C_STATUS_SUCCESS) break;
         }
 #else
-        i2c_write_register(i2c_addresses[index] << 1, i, driver_buffers[index].pwm_buffer + i, 16, SNLED27351_I2C_TIMEOUT);
+        i2c_write_register(i2c_addresses[index] << 1, i, buffer + i, 16, SNLED27351_I2C_TIMEOUT);
 #endif
     }
 }
@@ -221,11 +243,18 @@ void snled27351_set_led_control_register(uint8_t index, bool red, bool green, bo
 }
 
 void snled27351_update_pwm_buffers(uint8_t index) {
-    if (driver_buffers[index].pwm_buffer_dirty) {
+    bool overlay = snled27351_flush_override != NULL;
+
+    // While the overlay is showing, only the overlay's own dirtiness matters:
+    // the effect's pwm_buffer isn't displayed, so its dirty flag is neither a
+    // reason to flush nor something to consume (it must survive for the
+    // deactivation repaint).  When the overlay is off, fall back to the normal
+    // pwm_buffer dirty / one-shot force flush.
+    bool need = overlay ? snled27351_overlay_dirty : (driver_buffers[index].pwm_buffer_dirty || snled27351_force_flush);
+
+    if (need) {
         snled27351_select_page(index, SNLED27351_COMMAND_PWM);
-
-        snled27351_write_pwm_buffer(index);
-
+        snled27351_write_pwm_buffer(index, overlay ? snled27351_flush_override + index * SNLED27351_PWM_REGISTER_COUNT : driver_buffers[index].pwm_buffer);
         driver_buffers[index].pwm_buffer_dirty = false;
     }
 }
@@ -246,6 +275,8 @@ void snled27351_flush(void) {
     for (uint8_t i = 0; i < SNLED27351_DRIVER_COUNT; i++) {
         snled27351_update_pwm_buffers(i);
     }
+    snled27351_force_flush   = false; // one-shot
+    snled27351_overlay_dirty = false; // one-shot
 }
 
 void snled27351_sw_return_normal(uint8_t index) {

@@ -22,6 +22,10 @@ static bool     overview_active   = false;
 static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
+static uint32_t last_activity = 0;
+void indicator_update_activity(void) {
+   last_activity = timer_read32();
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Layer ↔ LED mapping
@@ -133,10 +137,34 @@ void feature_overview_handle_key(keyrecord_t *record) {
         case PACK_MTX(0, 9):   // 9 — layer-visualization lock
             layer_visualizer_lock_toggle();
             break;
+        case POS_KC_MUTE:      // knob button — return to default layer
+            feature_overview_return_default();
+            break;
         default:               // any other key — exit overview
             feature_overview_cancel();
             return;
     }
+    feature_overview_reset_timer();
+}
+
+// ── Encoder (knob) handling during overview ──────────────────────────────
+// Rotate the knob to cycle layers 0-8 (like the number keys); press the knob
+// to return to the default layer.
+
+void feature_overview_return_default(void) {
+    // Always land on the default layer (Mac base = 0 or Win base = 1),
+    // regardless of the current layer.
+    layer_move(get_highest_layer(default_layer_state));
+    feature_overview_reset_timer();
+}
+
+void feature_overview_encoder(bool clockwise) {
+    // Cycle 0..8 (9 is the layer-visualization lock, not a layer).
+    uint8_t current = get_highest_layer(layer_state);
+    if (current > 8) current = 0;  // safety: never cycle into the vis-lock slot
+
+    uint8_t next = clockwise ? ((current + 1) % 9) : (current == 0 ? 8 : current - 1);
+    layer_move(next);
     feature_overview_reset_timer();
 }
 
@@ -168,36 +196,44 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
     if (!rgb_matrix_is_enabled()) return;
 
     if (overview_active) {
+        // ── Overview mode: dark screen + indicator grid, into the OVERLAY
+        //    buffer — never the effect's pwm_buffer, so lazy effects keep
+        //    their per-key state.  layer_visualizer_frame() flips the driver's
+        //    flush override to display this buffer while overview is open.
+        overlay_clear_all();
 
-    // ── Overview mode: clear all and draw indicator grid ──────────────
-    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
-        rgb_matrix_driver.set_color(i, 0, 0, 0);
+        // Active-layer indicator (white)
+        uint8_t led = indicator_led_for_layer();
+        if (led < RGB_MATRIX_LED_COUNT)
+            overlay_set_color(led, 255, 255, 255);
+
+        // Feature indicators (active=white, inactive=red)
+        typedef struct { uint8_t led; bool active; } ind_t;
+        ind_t list[] = {
+            { IND_AUTO_SHIFT,  feature_auto_shift()                       },
+            { IND_TAP_DANCE,   feature_tap_dance()                        },
+            { IND_CAPS_WORD,   feature_caps_word()                        },
+            { IND_REPEAT_KEY,  feature_repeat_key()                       },
+            { IND_DYN_MACRO,   feature_dyn_macro()                        },
+            { IND_LEADER,      feature_leader()                           },
+            { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
+            { IND_NKRO,        keymap_config.nkro                         },
+            { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
+        };
+        for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
+            overlay_set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
+        }
+
+#if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
+        // Caps Lock stays visible over the dark screen.
+        if (!os_ind_cfg.disable.caps_lock && host_keyboard_led_state().caps_lock) {
+            overlay_set_color(CAPS_LOCK_INDEX, 255, 255, 255);
+        }
+#endif
+        return;
     }
 
-    // Active-layer indicator (white)
-    uint8_t led = indicator_led_for_layer();
-    if (led < RGB_MATRIX_LED_COUNT)
-        rgb_matrix_driver.set_color(led, 255, 255, 255);
-
-    // Feature indicators (active=white, inactive=red)
-    typedef struct { uint8_t led; bool active; } ind_t;
-    ind_t list[] = {
-        { IND_AUTO_SHIFT,  feature_auto_shift()                       },
-        { IND_TAP_DANCE,   feature_tap_dance()                        },
-        { IND_CAPS_WORD,   feature_caps_word()                        },
-        { IND_REPEAT_KEY,  feature_repeat_key()                       },
-        { IND_DYN_MACRO,   feature_dyn_macro()                        },
-        { IND_LEADER,      feature_leader()                           },
-        { IND_AUTOCORRECT, keymap_config.autocorrect_enable           },
-        { IND_NKRO,        keymap_config.nkro                         },
-        { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
-    };
-    for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
-        rgb_matrix_driver.set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
-    }
-    }  // if (overview_active)
-
-    // Caps Lock is drawn last so it stays visible over the overview grid.
+    // Normal path: caps lock into the pwm_buffer (as before).
 #if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
     caps_lock_indicate(led_min, led_max);
 #endif
@@ -205,7 +241,20 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
 // Per-loop timeout check
 // ═════════════════════════════════════════════════════════════════════════════
 
+
 void indicator_task(void) {
+    // ── Idle RGB dimming ──────────────────────────────────────────────
+    // BROKEN, so disabled for now. The rgb saves feature overview led states and never comes back to the effect.
+    // if (timer_elapsed32(last_activity) > IDLE_DIM_TIMEOUT_MS) {
+    //     saved_rgb_mode    = rgb_matrix_config.mode;
+    //     saved_rgb_enabled = rgb_matrix_config.enable;
+    //     rgb_matrix_sethsv(0, 0, 0.1);  // dim white at 10% brightness
+    // } else if (saved_rgb_enabled) {
+    //     rgb_matrix_config.mode = saved_rgb_mode;
+    //     rgb_matrix_config.enable = saved_rgb_enabled;
+    //     saved_rgb_enabled = false;  // only restore once
+    // }
+
     if (!overview_active) return;
     // When layer-visualization is locked (9 key / 10th indicator), the
     // overview is considered "permanent" — don't auto-exit.  This matches

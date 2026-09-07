@@ -378,6 +378,37 @@ void rgb_feedback_trigger(void) {
 // updates the overlay colors.  The EEPROM reads are fast (flash-backed
 // NVM on STM32, ~100 ns each) — 68 LEDs × 2 bytes ≈ 14 µs per frame.
 
+// Overlay display buffer (one pwm_buffer-sized block per driver).  The overlay
+// (layer visualization OR feature overview) renders here instead of into the
+// driver's pwm_buffer, so lazy effects (jellybean raindrops, pixel rain) keep
+// their per-key state.  snled27351_flush_override points at this buffer while
+// the overlay is showing, so the driver flushes it instead of the pwm_buffer.
+static uint8_t overlay_pwm[SNLED27351_DRIVER_COUNT][SNLED27351_LED_PWM_LENGTH] = {0};
+
+// Writes one LED into the overlay buffer.  Skips unchanged pixels and only
+// marks the overlay dirty when a pixel actually changes, so the driver's flush
+// (which keys off snled27351_overlay_dirty) is skipped while the overlay is
+// static.  Shared with the feature overview (indicators.c).
+void overlay_set_color(uint8_t led, uint8_t r, uint8_t g, uint8_t b) {
+    snled27351_led_t snled;
+    memcpy_P(&snled, &g_snled27351_leds[led], sizeof(snled));
+
+    uint8_t *px = overlay_pwm[snled.driver];
+    if (px[snled.r] == r && px[snled.g] == g && px[snled.b] == b) {
+        return;  // unchanged — leave the dirty flag alone
+    }
+    px[snled.r] = r;
+    px[snled.g] = g;
+    px[snled.b] = b;
+    snled27351_overlay_dirty = true;
+}
+
+void overlay_clear_all(void) {
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        overlay_set_color(led, 0, 0, 0);
+    }
+}
+
 static void draw_layer(uint8_t layer) {
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
         uint16_t mtx  = led_to_mtx[led];
@@ -385,10 +416,10 @@ static void draw_layer(uint8_t layer) {
         uint8_t  col  = mtx & 0xFF;
         uint16_t kc   = dynamic_keymap_get_keycode(layer, row, col);
         key_category_t cat = categorize(kc);
-        rgb_matrix_driver.set_color(led,
-                             pgm_read_byte(&cat_colors[cat][0]),
-                             pgm_read_byte(&cat_colors[cat][1]),
-                             pgm_read_byte(&cat_colors[cat][2]));
+        overlay_set_color(led,
+                          pgm_read_byte(&cat_colors[cat][0]),
+                          pgm_read_byte(&cat_colors[cat][1]),
+                          pgm_read_byte(&cat_colors[cat][2]));
     }
 }
 
@@ -406,4 +437,32 @@ void layer_visualizer_draw(void) {
     } else {
         draw_layer(vis_layer);
     }
+}
+
+/// Called every RGB frame (from rgb_matrix_indicators_advanced_user) before
+/// the indicators are drawn.  Toggles the driver's flush override so the
+/// overlay's pixels (layer visualization OR feature overview, both in
+/// overlay_pwm) are displayed instead of the effect's pwm_buffer — without
+/// ever clobbering the effect's per-key state, which lazy effects (jellybean
+/// raindrops, pixel rain) store in the buffer.
+void layer_visualizer_frame(void) {
+    static bool prev_showing = false;
+    bool        showing      = feature_overview_is_active()
+                            || ((perm_active || moment_active) && !rgb_feedback_active);
+
+    if (showing && !prev_showing) {
+        snled27351_flush_override = &overlay_pwm[0][0];
+        // The overlay buffer may already hold the exact colors from a previous
+        // activation (same layer/keymap), so overlay_set_color would early-return
+        // and leave it "clean".  Force a flush so the display actually switches
+        // from the effect's pwm_buffer to the overlay.
+        snled27351_overlay_dirty = true;
+    } else if (!showing && prev_showing) {
+        snled27351_flush_override = NULL;
+        // Force the effect's pwm_buffer to be flushed once — it may not be
+        // dirty (static effects early-return), yet the hardware still shows the
+        // overlay and must be repainted with the effect's colors.
+        snled27351_force_flush = true;
+    }
+    prev_showing = showing;
 }

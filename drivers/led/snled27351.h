@@ -124,6 +124,21 @@ typedef struct snled27351_led_t {
 
 extern const snled27351_led_t PROGMEM g_snled27351_leds[SNLED27351_LED_COUNT];
 
+// Optional flush override: when non-NULL, the flush sends this buffer instead
+// of the driver's pwm_buffer.  Holds SNLED27351_DRIVER_COUNT contiguous
+// pwm_buffer-sized blocks (one per driver).  Set it to an external buffer to
+// display overlay colors without clobbering the effect's per-key state.
+extern const uint8_t *snled27351_flush_override;
+
+// One-shot: set true to force the next flush to send the driver's pwm_buffer
+// even if it isn't dirty (cleared by snled27351_flush).  Used to repaint the
+// effect's buffer when an overlay is removed.
+extern bool snled27351_force_flush;
+
+// Set by the overlay writer when it changes a pixel; cleared by snled27351_flush.
+// Drives the flush while snled27351_flush_override is active.
+extern bool snled27351_overlay_dirty;
+
 void snled27351_init_drivers(void);
 void snled27351_init(uint8_t index);
 void snled27351_select_page(uint8_t index, uint8_t page);
