@@ -25,6 +25,7 @@ static bool     saved_rgb_on    = false;
 static bool        knob_pending   = false;  ///< press held back (not registered)
 static bool        knob_live      = false;  ///< press replayed; release must pass
 static keyrecord_t knob_press_rec;
+static uint16_t    knob_press_kc  = KC_NO;  ///< mapped keycode captured at press
 static uint32_t    knob_press_time = 0;
 
 #define KNOB_POS POS_KC_MUTE  // (0,14)
@@ -118,8 +119,9 @@ static void picker_dispatch(uint16_t keycode, keyrecord_t *record) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 static void knob_replay_down(void) {
-    knob_press_rec.event.time = timer_read();
-    process_record(&knob_press_rec);  // register the mapped key (e.g. KC_MUTE)
+    // Register the mapped key (e.g. KC_MUTE) directly, bypassing layer/mod
+    // re-resolution; it stays down until the physical release lifts it.
+    if (knob_press_kc != KC_NO && knob_press_kc != KC_TRNS) register_code16(knob_press_kc);
     knob_live = true;
 }
 
@@ -149,31 +151,27 @@ bool layer_picker_pre_process(uint16_t keycode, keyrecord_t *record) {
             // press must need a fresh LAYER_PICKER_HOLD_MS hold.
             knob_pending     = true;
             knob_live        = false;
+            knob_press_kc    = keycode;   // mapped key, e.g. KC_MUTE
             knob_press_rec   = *record;
             knob_press_time  = timer_read();
             return false;  // hold back — nothing registered yet
         } else {
             if (knob_pending) {
-                // Short press → replay the mapped key as a single tap.
-                // Send the press, let the report transmit, then release —
-                // otherwise down+up in the same instant can collapse on the
-                // host and the media key (e.g. mute) never toggles.
+                // Short press → tap the mapped key directly.  register + wait
+                // + unregister guarantees a distinct media-key press reaches
+                // the host (down+up via the event chain was being dropped).
                 knob_pending = false;
-                keyrecord_t down = knob_press_rec;
-                down.event.time  = timer_read();
-                process_record(&down);
-                wait_ms(KNOB_TAP_RELEASE_DELAY_MS);
-                keyrecord_t up = *record;
-                up.event.time   = timer_read();
-                process_record(&up);
+                if (knob_press_kc != KC_NO && knob_press_kc != KC_TRNS) {
+                    register_code16(knob_press_kc);
+                    wait_ms(KNOB_TAP_RELEASE_DELAY_MS);
+                    unregister_code16(knob_press_kc);
+                }
                 return false; // owned it; consume
             }
             knob_live = false; // was replayed; let the real release pass
             return true;
         }
     }
-
-    // Any other key pressed while the knob is held back → abort the hold and
     // replay the knob key (rollover), then process this key normally.
     if (knob_pending && record->event.pressed) {
         knob_pending = false;
