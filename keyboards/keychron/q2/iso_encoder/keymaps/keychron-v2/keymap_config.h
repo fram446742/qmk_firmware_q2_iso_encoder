@@ -2,17 +2,34 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * KEYMAP CONFIGURATION — single file for all tunable constants and defaults
+ *  KEYMAP CONFIGURATION  —  the ONE place to tune everything
  * ═════════════════════════════════════════════════════════════════════════════
  *
- * Change any value here and rebuild.  All feature code reads from this file.
+ *  Every user-facing constant for this keymap lives here, grouped by feature.
+ *  Change a value, rebuild, flash.  Feature code only ever reads from this file.
  *
- * Include AFTER QMK_KEYBOARD_H + keychron_common.h (needs KC_* keycodes,
- * COMBO_END, NEW_SAFE_RANGE, etc.)  Do NOT include from config.h — that
- * file is processed before QMK headers are available.
+ *  ══  TABLE OF CONTENTS  ═══════════════════════════════════════════════════
+ *    § 1  Layers                       (names, count, jump helpers)
+ *    § 2  Feature overview             (O + [ screen: entry, timeout)
+ *    § 3  Layer mode / picker          (knob-hold screen: hold/timeout)
+ *    § 4  Layer visualization          (key-category overlay colors + timing)
+ *    § 5  Tap overrides                (double-tap: types, timing, defaults)
+ *    § 6  Leader key                   (modifier auto-select)
+ *    § 7  Combos                       (position combos + native-combo guard)
+ *    § 8  Runtime feature flags        (the 7 EEPROM on/off bits)
+ *    § 9  EEPROM layout                (structs + addresses)
+ *    §10  HID protocol VALUE ids       (shared with qmk_config_tool.py)
+ *    §11  Indicator LED indices        (which physical LED lights what)
+ *    §12  Boot-time defines (config.h) (VIA limits, lock LEDs — include order)
  *
- * The Python tool (qmk_config_tool.py) reads this file for HID protocol
- * constants (VALUE_*, EEP_*, EEPROM structs, defaults).
+ *  ══  INCLUDE ORDER  ══════════════════════════════════════════════════════
+ *  Include this AFTER QMK_KEYBOARD_H + keychron_common.h (needs KC_* keycodes,
+ *  COMBO_END, NEW_SAFE_RANGE, …).  Do NOT include it from config.h — that file
+ *  is processed before the QMK headers are available (see §12).
+ *
+ *  The Python tool (qmk_config_tool.py) parses this file for the HID protocol
+ *  constants (VALUE_*, EEP_*, the EEPROM structs, and the *_DEFAULTS lists),
+ *  so do not rename or renumber anything in §9–§10.
  */
 
 #pragma once
@@ -21,23 +38,89 @@
 #include <stdbool.h>
 
 // Auto-generated — matrix positions (POS_KC_xxx) and LED indices (POS_IDX_xxx)
-// from keyboard.json + MAC_BASE layer.  Regenerated every build.
+// from keyboard.json + the MAC_BASE layer.  Regenerated every build.
 #include "key_positions.h"
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// TIMINGS (milliseconds)
-// ═════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §1  LAYERS
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-#define TAP_TERM               200     ///< Tap-dance double-tap timeout
-#define OVERVIEW_TIMEOUT_MS  10000     ///< Feature overview auto-exit (0 = no timeout)
+// Adding a layer: insert it above _FN6 and bump KEYMAP_LAYER_COUNT.
+// Removing a layer: delete it and adjust KEYMAP_LAYER_COUNT.
+#define KEYMAP_LAYER_COUNT 9
+
+enum layers {
+    MAC_BASE,   // 0  macOS default layer
+    WIN_BASE,   // 1  Windows default layer
+    MAC_FN1,    // 2  macOS Fn layer (hold FN1_MAC)
+    WIN_FN1,    // 3  Windows Fn layer (hold FN1_WIN)
+    _FN2,       // 4
+    _FN3,       // 5
+    _FN4,       // 6
+    _FN5,       // 7
+    _FN6,       // 8
+};
+
+// Convenience aliases for the momentary Fn keys used in the keymap.
+#define FN1_MAC  MO(MAC_FN1)
+#define FN1_WIN  MO(WIN_FN1)
+#define FN2      MO(_FN2)
+
+// Number-row layer jump used by the overview / layer-mode screens:
+// if already on layer N, jump back to the default layer; otherwise go to N.
+#define LAYER_MOVE_OR_DEFAULT(N) do {                                      \
+    if (get_highest_layer(layer_state) == (N))                             \
+        layer_move(get_highest_layer(default_layer_state));                \
+    else                                                                    \
+        layer_move(N);                                                      \
+} while (0)
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// LAYER VISUALIZATION  —  show key categories in color for N ms after layer change
-// ═════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §2  FEATURE OVERVIEW  —  the O + [ config screen
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-#define LAYER_VIS_TIMEOUT_MS  1500     ///< How long the overlay stays on (ms)
+// Auto-exit when the overview is left idle.  0 = never auto-exit.
+#define OVERVIEW_TIMEOUT_MS 10000
+
+// The overview opens by pressing O (1,9) and [ (1,11) TOGETHER.  The chord is
+// matched by PHYSICAL matrix position in pre_process_record_user — never by
+// keycode — so it works from any layer.  Its keys are reserved: a combo that
+// reuses them (keycode KC_O/KC_LBRC or positions) fails to compile (§7).
+//
+// Chord keys are held back (nothing registered) until they resolve: partner →
+// overview opens; released alone → normal single key; this window elapses while
+// held, or another key interrupts → the key is re-pressed normally.
+#define OV_CHORD_TERM_MS 60     // ms window to complete the O+[ chord
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §3  LAYER MODE / LAYER PICKER  —  hold the knob to pick a layer
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// Knob button held this long (ms) → enter layer mode (only layer LEDs light).
+#define LAYER_PICKER_HOLD_MS     3000
+// Auto-exit when the picker is left idle.  0 = never auto-exit.
+#define LAYER_PICKER_TIMEOUT_MS 10000
+
+// (The knob button's physical key is held back too, so the key mapped to it —
+// e.g. KC_MUTE — only fires on a short press; a long press never leaks it.)
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §4  LAYER VISUALIZATION  —  color every key by category on layer change
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// How long the color overlay stays after a layer change / on the vis-lock.
+#define LAYER_VIS_TIMEOUT_MS 1500
+
+// How many momentary Fn (MO) keys the visualizer tracks at once (held together).
+#define MAX_HELD_MO 8
+
+// While an RGB/underglow key is pressed, show the raw effect for this long so
+// you can see the change; the layer overlay resumes afterwards.
+#define RGB_FEEDBACK_DURATION_MS 1000
 
 // ── Colors per key category  {R, G, B} ─────────────────────────────────────
 #define LV_COLOR_BYPASS    {5, 5, 5}       ///< transparent keys (_______) — dim grey
@@ -48,18 +131,19 @@
 #define LV_COLOR_BASIC     {0, 170, 0}     ///< alpha, numbers, navigation — green
 #define LV_COLOR_MEDIA     {0, 90, 230}    ///< media keys — medium blue
 #define LV_COLOR_MACRO     {255, 0, 200}   ///< macro keys — magenta
-#define LV_COLOR_SPECIAL   {200, 100, 0}   ///< Keychron custom (KC_TASK, etc.) — dark orange
+#define LV_COLOR_SPECIAL   {200, 100, 0}   ///< Keychron custom (KC_TASK, …) — dark orange
 #define LV_COLOR_LIGHT     {200, 200, 0}   ///< lighting/RGB keys — yellow
 #define LV_COLOR_CUSTOM    {120, 0, 255}   ///< user custom keycodes — purple
 #define LV_COLOR_LAYER     {255, 0, 0}     ///< layer management — red
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// OVERLAY ROLE COLORS  —  pick the color of each indicator role here.
-// ═════════════════════════════════════════════════════════════════════════════
-// RGB triplets, used by the feature-overview screen (indicators.c) and the
-// layer-picker / "layer mode" screen (layer_picker.c).  Add roles here as you
-// add screens; keep every draw site reading from these macros, never hardcoded.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §5  OVERLAY ROLE COLORS  —  indicator LEDs shared by the screens
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// RGB triplets used by the feature-overview and layer-mode screens (and the
+// caps-lock overlay).  Add roles here as you add screens; keep every draw site
+// reading from these macros, never hardcoded.
 #define IND_LAYER_ACTIVE   {255, 255, 255}  ///< the layer you're on (white)
 #define IND_LAYER_CHOICE   {255, 0, 0}      ///< another layer you can jump to (red)
 #define IND_FEATURE_ON     {255, 255, 255}  ///< a feature toggle that is ON (white)
@@ -67,177 +151,27 @@
 #define IND_CAPS_LOCK_ON   {255, 255, 255}  ///< caps-lock drawn over the overlay
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// LAYER-PICKER ("layer mode")  —  hold the knob button to switch only layers
-// ═════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §6  TAP OVERRIDES  —  double-tap a key to fire an action (no QMK tap dance)
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-#define LAYER_PICKER_HOLD_MS     3000  ///< knob held this long → enter layer mode
-#define LAYER_PICKER_TIMEOUT_MS 10000  ///< auto-exit when idle (0 = none)
+// Double-tap window (ms).
+#define TAP_TERM 200
 
-// Overview-entry chord (O + [) resolution window — keys are held back (never
-// registered) until this elapses or the second chord key arrives.
-#define OV_CHORD_TERM_MS 60
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// FEATURE BIT FLAGS  (stored as uint8_t in EEPROM at address EEP_FEATURES)
-// ═════════════════════════════════════════════════════════════════════════════
-
-#define FEATURE_TAP_DANCE   (1 << 0)  ///< Tap-dance keycode override
-#define FEATURE_AUTO_SHIFT  (1 << 1)  ///< Auto-shift on/off
-#define FEATURE_CAPS_WORD   (1 << 2)  ///< Caps Word processing
-#define FEATURE_REPEAT_KEY  (1 << 3)  ///< Repeat / Alt-Repeat processing
-#define FEATURE_DYN_MACRO   (1 << 4)  ///< Dynamic Macro processing
-#define FEATURE_LEADER      (1 << 5)  ///< Leader key sequences
-#define FEATURE_LAYER_VIS   (1 << 6)  ///< Layer visualization (show key categories on layer change)
-// bit 7 reserved
-
-/// Default feature flags at first boot  (Caps Word + Repeat + Layer Vis ON, others OFF)
-#define DEFAULT_FEATURE_FLAGS  (FEATURE_CAPS_WORD | FEATURE_REPEAT_KEY | FEATURE_LAYER_VIS)
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// MAX COUNTS
-// ═════════════════════════════════════════════════════════════════════════════
-
-#define MAX_TAP_OVERRIDES  20
-#define MAX_COMBOS          8
-#define MAX_LEADERS        16
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// TAP OVERRIDE  —  double-tap action type
-// ═════════════════════════════════════════════════════════════════════════════
-
+// What a double-tap does:
 typedef enum {
-    TD_DBL_KEYCODE      = 0,  ///< Single keycode (or modded, e.g. S(KC_2))
-    TD_DBL_UNICODE_STR  = 1,  ///< Unicode string via send_unicode_string()
-    TD_DBL_UNICODE_CP   = 2,  ///< Unicode codepoint via register_unicode()
-    TD_DBL_SEND_STRING  = 3,  ///< ASCII string (≤4 chars) via send_string()
+    TD_DBL_KEYCODE     = 0,  ///< a single keycode (or modded, e.g. S(KC_2))
+    TD_DBL_UNICODE_STR = 1,  ///< Unicode string via send_unicode_string()
+    TD_DBL_UNICODE_CP  = 2,  ///< Unicode codepoint via register_unicode()
+    TD_DBL_SEND_STRING = 3,  ///< ASCII string (≤4 chars) via send_string()
 } td_dbl_type_t;
 
-
-// ═════════════════════════════════════════════════════════════════════════════
-// EEPROM STRUCTS  (packed — binary layout matches Python tool)
-// ═════════════════════════════════════════════════════════════════════════════
-
-// How base_id is interpreted in eeprom_tap_t
-typedef enum {
-    BASE_IS_KEYCODE = 0,   ///< base_id is a QMK keycode (e.g. KC_BSPC) — current behavior
-    BASE_IS_MATRIX  = 1,   ///< base_id is a packed matrix position (row << 8 | col)
-} tap_base_type_t;
-
-typedef struct __attribute__((packed)) {
-    uint16_t base_id;       ///< keycode (type=0) or packed matrix position (type=1)
-    uint16_t tap_kc;        ///< keycode to fire for single tap
-    uint8_t  dbl_type;      ///< td_dbl_type_t
-    uint8_t  base_type;     ///< tap_base_type_t — how to interpret base_id
-    uint16_t dbl_val;       ///< depends on dbl_type
-    uint16_t dbl_extra;     ///< depends on dbl_type
-} eeprom_tap_t;
-
-typedef struct __attribute__((packed)) {
-    uint16_t keys[4];     ///< 0 = terminator; up to 4 keys per combo
-    uint16_t output;      ///< keycode to fire
-} eeprom_combo_t;
-
-typedef struct __attribute__((packed)) {
-    uint8_t  seq[3];      ///< keycodes in sequence; 0 = terminator
-    uint8_t  mod;         ///< QMK MOD_* value, not a keycode (e.g. MOD_LGUI = 0x08)
-    uint16_t key;         ///< final keycode to fire
-} eeprom_leader_t;
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// POSITION COMBO  —  custom processor (features.c), matrix-position matching
-// ═════════════════════════════════════════════════════════════════════════════
-// Base type reuses tap_base_type_t: BASE_IS_KEYCODE (keys[] are KC_*) or
-// BASE_IS_MATRIX (keys[] are POS_KC_* / PACK_MTX).  Independent of QMK-native
-// combos and of the feature-overview chord.  The chord's matrix positions
-// (POS_KC_O / POS_KC_LBRC) are RESERVED: a position combo reusing them fails
-// to compile (duplicate enum member) — keep every new combo's keys in the
-// POS_COMBOS_KEYCHECK list below so the check stays live.
-
-typedef struct {
-    uint8_t  key_count;   ///< number of keys in this combo (1-4)
-    uint8_t  base_type;   ///< tap_base_type_t — keycode vs matrix position
-    uint16_t keys[4];     ///< values to match; unused = 0
-    uint16_t output;      ///< keycode to fire when all keys held
-} pos_combo_def_t;
-
-#define POS_COMBO(count, type, out, ...) \
-    { .key_count = (count), .base_type = (type), .keys = {__VA_ARGS__}, .output = (out) }
-
-// Compile-time guard against reusing the feature-overview chord keys.
-#define CKPOS(p) POSCOMBO_KEYCHECK_##p
-enum pos_combo_reserved_check {
-    CKPOS(POS_KC_O),     // overview chord — reserved
-    CKPOS(POS_KC_LBRC),  // overview chord — reserved
-    // Register every key of each new position combo here too, e.g.:
-    // CKPOS(POS_KC_Q), CKPOS(POS_KC_W),
-    POSCOMBO_KEYCHECK_END,
-};
-#undef CKPOS
-
-// Runtime position-combo definitions (empty by default).  When you add one,
-// ALSO add its keys to pos_combo_reserved_check above.
-#define POS_COMBOS_DEFS \
-    /* POS_COMBO(2, BASE_IS_MATRIX, KC_X, POS_KC_Q, POS_KC_W), */
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// EEPROM ADDRESSES  (dynamically calculated — edit MAX_* or structs above)
-// ═════════════════════════════════════════════════════════════════════════════
+// Default double-tap overrides, loaded at first boot (or when EEPROM is blank).
+// Entries use eeprom_tap_t field initializers; the count is derived at compile
+// time via sizeof, so add/remove/reorder freely.  The {0} sentinel stays last.
 //
-//  8100         Feature flags (1 B)
-//  8101         Tap override count (1 B)
-//  8101+1 …     Tap override entries (MAX_TAP_OVERRIDES × sizeof(eeprom_tap_t))
-//  NEXT         Combo count (1 B)
-//  NEXT+1 …     Combo entries (MAX_COMBOS × sizeof(eeprom_combo_t))
-//  NEXT         Leader count (1 B)
-//  NEXT+1 …     Leader entries (MAX_LEADERS × sizeof(eeprom_leader_t))
-//
-//  Change MAX_TAP_OVERRIDES, MAX_COMBOS, MAX_LEADERS, or any struct
-//  and everything adjusts automatically (verified by static_assert below).
-
-#define EEP_FEATURES        8100
-#define EEP_TAP_BASE        (EEP_FEATURES + 1)
-#define EEP_TAP_SIZE        (MAX_TAP_OVERRIDES * sizeof(eeprom_tap_t))
-
-#define EEP_COMBO_BASE      (EEP_TAP_BASE + 1 + EEP_TAP_SIZE)
-#define EEP_COMBO_SIZE      (MAX_COMBOS * sizeof(eeprom_combo_t))
-
-#define EEP_LEADER_BASE     (EEP_COMBO_BASE + 1 + EEP_COMBO_SIZE)
-#define EEP_LEADER_SIZE     (MAX_LEADERS * sizeof(eeprom_leader_t))
-
-// Total EEPROM usage = EEP_LEADER_BASE + 1 + EEP_LEADER_SIZE - EEP_FEATURES
-// ≈ 380 bytes — well within the 2 KB user-data area past VIA's buffer.
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// HID PROTOCOL VALUE IDs  (via_custom_value_command_kb — shared with Python tool)
-// ═════════════════════════════════════════════════════════════════════════════
-
-#define VALUE_FLAGS        0x01
-#define VALUE_TAP_COUNT    0x02
-#define VALUE_TAP_ENTRY    0x03
-#define VALUE_COMBO_COUNT  0x04
-#define VALUE_COMBO_ENTRY  0x05
-#define VALUE_LEADER_COUNT 0x06
-#define VALUE_LEADER_ENTRY 0x07
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// DEFAULT TAP-OVERRIDE ENTRIES  (loaded at first boot or when EEPROM is blank)
-// ═════════════════════════════════════════════════════════════════════════════
-//
-// Entries use eeprom_tap_t field initializers.  Add, remove, or reorder
-// freely — the count is derived at compile time via sizeof.
-// A {0} sentinel marks the end of the list; keep it as the last entry.
-//
-//  base_type=1 → base_id = POS_KC_xxx (follows physical key, survives layout change)
-//  base_type=0 → base_id = KC_xxx keycode (follows the keycode label)
-
+//   base_type=0 → base_id is a KC_xxx keycode (follows the key's label)
+//   base_type=1 → base_id is a POS_KC_xxx matrix position (follows the key)
 #define TAP_DEFAULTS \
     {.base_id=QK_GESC, .tap_kc=QK_GESC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(QK_GESC)}, \
     {.base_id=KC_E,    .tap_kc=KC_E,    .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=RALT(KC_E)},    \
@@ -256,103 +190,157 @@ enum pos_combo_reserved_check {
     {.base_id=KC_BSPC, .tap_kc=KC_BSPC, .dbl_type=TD_DBL_KEYCODE, .base_type=0, .dbl_val=KC_DEL}, \
     {0}  /* sentinel — all fields zero, keep last */
 
-// Combo and leader defaults start empty (sentinel-only entries → zero count).
-// {{0}} uses nested braces for the first-member array (keys[]/seq[]) to
-// satisfy -Werror=missing-braces.  Add real entries above the sentinel
-// to ship with default combos/leaders.
+// The optional combo/leader default lists start empty (sentinel only → count 0).
+// {{0}} = nested braces for the first-member array (keys[]/seq[]) to satisfy
+// -Werror=missing-braces.  Add real entries above the sentinel to ship with
+// default combos/leaders.
 #define COMBO_DEFAULTS   {{0}}  // sentinel-only = empty list
 #define LEADER_DEFAULTS  {{0}}  // sentinel-only = empty list
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// LAYERS
-// ═════════════════════════════════════════════════════════════════════════════
-//
-// Adding a layer: insert it above _FN6, bump KEYMAP_LAYER_COUNT.
-// Removing a layer: delete it, adjust KEYMAP_LAYER_COUNT.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §7  LEADER KEY  —  FN2+Q then a key
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-#define KEYMAP_LAYER_COUNT  9
+// Modifier auto-selects Cmd on the Mac layers, Ctrl on the Windows layers.
+#define LEADER_MOD(on_mac, base_kc)  ((on_mac) ? LGUI(base_kc) : LCTL(base_kc))
 
-// VIA/ dynamic-macro counts live at the bottom of this file (via #ifndef
-// fallbacks).  The actual overrides must be in config.h for include order.
+// QK_LEAD is placed on _FN2 at the Q position (see keymap.c).  The leader
+// timeout (LEADER_TIMEOUT in quantum/leader.h) defaults to 300 ms.
 
-enum layers {
-    MAC_BASE,
-    WIN_BASE,
-    MAC_FN1,
-    WIN_FN1,
-    _FN2,
-    _FN3,
-    _FN4,
-    _FN5,
-    _FN6,
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §8  COMBOS  —  position combos + the native-combo reserved-key guard
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// Custom position combos (features.c), matching by matrix position or keycode,
+// independent of QMK-native combos and of the feature-overview chord.
+// The chord's keys are RESERVED — a combo reusing them fails to compile.
+
+typedef struct {
+    uint8_t  key_count;   ///< number of keys in this combo (1-4)
+    uint8_t  base_type;   ///< tap_base_type_t — keycode vs matrix position
+    uint16_t keys[4];     ///< values to match; unused = 0
+    uint16_t output;      ///< keycode to fire when all keys held
+} pos_combo_def_t;
+
+#define POS_COMBO(count, type, out, ...) \
+    { .key_count = (count), .base_type = (type), .keys = {__VA_ARGS__}, .output = (out) }
+
+// Compile-time guard: reject any position combo that reuses the overview chord.
+#define CKPOS(p) POSCOMBO_KEYCHECK_##p
+enum pos_combo_reserved_check {
+    CKPOS(POS_KC_O),     // overview chord — reserved
+    CKPOS(POS_KC_LBRC),  // overview chord — reserved
+    // Register every key of each new position combo here too, e.g.:
+    // CKPOS(POS_KC_Q), CKPOS(POS_KC_W),
+    POSCOMBO_KEYCHECK_END,
 };
+#undef CKPOS
 
-// Convenience aliases
-#define FN1_MAC  MO(MAC_FN1)
-#define FN1_WIN  MO(WIN_FN1)
-#define FN2      MO(_FN2)
+// Runtime position-combo definitions (empty by default).  When you add one,
+// ALSO add its keys to pos_combo_reserved_check above.
+#define POS_COMBOS_DEFS \
+    /* POS_COMBO(2, BASE_IS_MATRIX, KC_X, POS_KC_Q, POS_KC_W), */
 
-// If already on layer N, jump back to default; otherwise go to N.
-#define LAYER_MOVE_OR_DEFAULT(N) do {                                      \
-    if (get_highest_layer(layer_state) == (N))                             \
-        layer_move(get_highest_layer(default_layer_state));                \
-    else                                                                    \
-        layer_move(N);                                                      \
-} while(0)
+// (QMK-native keycode combos live in combos.c `key_combos[]`; their own guard
+//  there rejects KC_O / KC_LBRC the same way.)
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// FEATURE OVERVIEW — ENTRY
-// ═════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §9  RUNTIME FEATURE FLAGS  —  one EEPROM byte, toggled in the overview
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#define FEATURE_TAP_DANCE   (1 << 0)  ///< Tap-dance keycode override
+#define FEATURE_AUTO_SHIFT  (1 << 1)  ///< Auto-shift on/off
+#define FEATURE_CAPS_WORD   (1 << 2)  ///< Caps Word processing
+#define FEATURE_REPEAT_KEY  (1 << 3)  ///< Repeat / Alt-Repeat processing
+#define FEATURE_DYN_MACRO   (1 << 4)  ///< Dynamic Macro processing
+#define FEATURE_LEADER      (1 << 5)  ///< Leader key sequences
+#define FEATURE_LAYER_VIS   (1 << 6)  ///< Layer visualization overlay
+// bit 7 reserved
+
+/// Flags enabled at first boot  (Caps Word + Repeat + Layer Vis ON, rest OFF)
+#define DEFAULT_FEATURE_FLAGS (FEATURE_CAPS_WORD | FEATURE_REPEAT_KEY | FEATURE_LAYER_VIS)
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §10  EEPROM LAYOUT  —  per-feature counts + packed on-disk structs
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// How many entries each feature can hold (upper bounds).
+#define MAX_TAP_OVERRIDES 20
+#define MAX_COMBOS         8
+#define MAX_LEADERS       16
+
+// How base_id is interpreted (used by tap entries AND position combos).
+typedef enum {
+    BASE_IS_KEYCODE = 0,  ///< a QMK keycode (e.g. KC_BSPC)
+    BASE_IS_MATRIX  = 1,  ///< a packed matrix position (row << 8 | col)
+} tap_base_type_t;
+
+// ── Packed EEPROM structs (binary layout matches qmk_config_tool.py) ──────
+typedef struct __attribute__((packed)) {
+    uint16_t base_id;       ///< keycode (type=0) or matrix position (type=1)
+    uint16_t tap_kc;        ///< keycode to fire for a single tap
+    uint8_t  dbl_type;      ///< td_dbl_type_t
+    uint8_t  base_type;     ///< tap_base_type_t
+    uint16_t dbl_val;       ///< depends on dbl_type
+    uint16_t dbl_extra;     ///< depends on dbl_type
+} eeprom_tap_t;
+
+typedef struct __attribute__((packed)) {
+    uint16_t keys[4];     ///< keycodes/positions; 0 = terminator
+    uint16_t output;      ///< keycode to fire
+} eeprom_combo_t;
+
+typedef struct __attribute__((packed)) {
+    uint8_t  seq[3];      ///< keycodes in sequence; 0 = terminator
+    uint8_t  mod;         ///< QMK MOD_* value, not a keycode (e.g. MOD_LGUI = 0x08)
+    uint16_t key;         ///< final keycode to fire
+} eeprom_leader_t;
+
+// ── Addresses (derived from the counts/structs above — edit those only) ────
+//  8100         Feature flags (1 B)
+//  8101         Tap count (1 B) + MAX_TAP_OVERRIDES × eeprom_tap_t
+//  NEXT         Combo count (1 B) + MAX_COMBOS × eeprom_combo_t
+//  NEXT         Leader count (1 B) + MAX_LEADERS × eeprom_leader_t
 //
-// The overview is opened by pressing O + [ TOGETHER, matched by PHYSICAL
-// matrix position (POS_KC_O + POS_KC_LBRC) in pre_process_record_user — not by
-// keycode, so it works from any layer (blank layers, remapped keys, no O/[ key
-// anywhere).  No QMK-native combos (COMBO_ENABLE = no) and no custom keycode
-// are involved; see indicators.c feature_overview_pre_process().
+//  Total ≈ 380 B — comfortably inside the 2 KB user-data area past VIA's buffer.
+#define EEP_FEATURES        8100
+#define EEP_TAP_BASE        (EEP_FEATURES + 1)
+#define EEP_TAP_SIZE        (MAX_TAP_OVERRIDES * sizeof(eeprom_tap_t))
 
-// ═════════════════════════════════════════════════════════════════════════════
-// FEATURE OVERVIEW — MATRIX POSITIONS  (row, col → dispatch)
-// ═════════════════════════════════════════════════════════════════════════════
-//
-// When overview is active, tapping these physical keys toggles the
-// corresponding feature.  Keycodes below the number row switch layers
-// via LAYER_MOVE_OR_DEFAULT.  Anything else exits overview.
-//
-// Positions are for the Q2 ISO-Encoder matrix layout:
-//
-//  Position   Key   Toggles
-//  ────────   ───   ──────────────────────
-//  (2, 1)     A     Auto-Shift
-//  (2, 2)     S     Auto-Correct
-//  (1, 5)     T     Tap Dance
-//  (3, 4)     C     Caps Word
-//  (1, 4)     R     Repeat Key
-//  (2, 3)     D     Dynamic Macro
-//  (2, 9)     L     Leader Key
-//  (3, 7)     N     NKRO toggle
-//  (0, 1-10)  1-0   Layer N / return to default
+#define EEP_COMBO_BASE      (EEP_TAP_BASE + 1 + EEP_TAP_SIZE)
+#define EEP_COMBO_SIZE      (MAX_COMBOS * sizeof(eeprom_combo_t))
+
+#define EEP_LEADER_BASE     (EEP_COMBO_BASE + 1 + EEP_COMBO_SIZE)
+#define EEP_LEADER_SIZE     (MAX_LEADERS * sizeof(eeprom_leader_t))
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// LED INDICATOR INDICES  (LED index in g_snled27351_leds[] order)
-// ═════════════════════════════════════════════════════════════════════════════
-//
-// Derived from POS_IDX_xxx macros in key_positions.h (auto-generated from
-// keyboard.json + the hardware LED wiring).  These match the physical LED
-// of each key.  During normal operation only CAPS_LOCK lights; the others
-// illuminate in overview mode.
-//
-// IMPORTANT: All IND_* are physical positions (POS_IDX_KC_xxx), not mapped
-// keycode lookups.  The LED follows the physical key even if the user
-// remaps the keycode on another layer via VIA/Launcher.  Caps Lock is the
-// canonical example: POS_IDX_KC_CAPS (LED 28 on iso_encoder) always shows
-// host caps state, not wherever KC_CAPS happens to be mapped.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §11  HID PROTOCOL VALUE IDs  —  via_custom_value_command_kb + Python tool
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#define VALUE_FLAGS        0x01
+#define VALUE_TAP_COUNT    0x02
+#define VALUE_TAP_ENTRY    0x03
+#define VALUE_COMBO_COUNT  0x04
+#define VALUE_COMBO_ENTRY  0x05
+#define VALUE_LEADER_COUNT 0x06
+#define VALUE_LEADER_ENTRY 0x07
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §12  INDICATOR LED INDICES  —  which physical LED lights what
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// Derived from the auto-generated POS_IDX_xxx macros (physical LED of each key,
+// so they follow the key even if its keycode is remapped).  Only CAPS_LOCK is
+// lit in normal operation; the rest illuminate in the overview screen.
 //
 //  Key   Purpose
 //  ───   ──────────────────────────
-//  Caps  Hardware Caps Lock state (handled by keychron_rgb.c, not here)
 //  A     Auto-Shift ON
 //  S     Auto-Correct ON
 //  T     Tap Dance ON
@@ -362,7 +350,6 @@ enum layers {
 //  L     Leader Key ON
 //  N     NKRO ON
 //  9     Layer-visualization lock ON (overview mode)
-
 #define IND_AUTO_SHIFT  POS_IDX_KC_A
 #define IND_TAP_DANCE   POS_IDX_KC_T
 #define IND_CAPS_WORD   POS_IDX_KC_C
@@ -371,14 +358,15 @@ enum layers {
 #define IND_LEADER      POS_IDX_KC_L
 #define IND_AUTOCORRECT POS_IDX_KC_S
 #define IND_NKRO        POS_IDX_KC_N
-
-// Layer-visualization lock indicator (the "9" key)
 #define IND_VIS_LOCK    POS_IDX_KC_9
 
-// ═════════════════════════════════════════════════════════════════════════════
-// LEADER KEY — modifier auto-selects Cmd on Mac layers, Ctrl on Windows
-// ═════════════════════════════════════════════════════════════════════════════
-// The QK_LEAD key is placed on _FN2 at the Q position in the keymap.
-// The leader timer (LEADER_TIMEOUT in quantum/leader.h) defaults to 300ms.
 
-#define LEADER_MOD(on_mac, base_kc)  ((on_mac) ? LGUI(base_kc) : LCTL(base_kc))
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §13  BOOT-TIME DEFINES  —  these MUST stay in the keymap config.h
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// VIA/dynamic-keymap limits (DYNAMIC_KEYMAP_LAYER_COUNT, _MACRO_COUNT) and the
+// lock-LED indices (WINLOCK_LED_LIST; NUM_LOCK_INDEX disabled) live in
+// keyboards/keychron/q2/iso_encoder/keymaps/keychron-v2/config.h because that
+// file is compiled BEFORE the QMK headers exist (they must override VIA's
+// defaults before QMK_KEYBOARD_H is seen).  Everything else is here.

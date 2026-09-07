@@ -124,13 +124,11 @@ static const uint8_t PROGMEM cat_colors[12][3] = {
 // frame — the same value state_notify.c reports to the Keychron Launcher — so
 // the overlay always matches the layer the keyboard is actually on.
 
-#define MAX_HELD_MO 8
-
 static bool     perm_active   = false;
 static uint32_t perm_start    = 0;
 static bool     moment_active = false;
 static uint8_t  vis_layer     = 0;  ///< cached layer for timer mode only
-static uint16_t mo_positions[MAX_HELD_MO];  ///< held MO keys, by matrix position
+static uint16_t mo_positions[MAX_HELD_MO];  ///< held MO keys, by matrix position (MAX_HELD_MO in keymap_config.h)
 static uint8_t  mo_count      = 0;  ///< how many MO keys held
 static bool     vis_locked    = false;  ///< lock: no auto-hide until next layer change
 
@@ -146,10 +144,10 @@ static bool mo_release_pending = false;
 static bool user_activity = false;
 
 // RGB feedback: temporarily disable layer visualization for 1 second
-// so the user can see the actual RGB effect changes
+// so the user can see the actual RGB effect changes.  (Duration is in
+// keymap_config.h — RGB_FEEDBACK_DURATION_MS.)
 static bool     rgb_feedback_active = false;
 static uint32_t rgb_feedback_timer  = 0;
-#define RGB_FEEDBACK_DURATION_MS 1000
 
 
 // ═════════════════════════════════════════════════════════════════════════════
