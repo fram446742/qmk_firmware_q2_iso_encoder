@@ -286,11 +286,10 @@ void layer_visualizer_task(void) {
     if (rgb_feedback_active) {
         if (timer_elapsed32(rgb_feedback_timer) > RGB_FEEDBACK_DURATION_MS) {
             rgb_feedback_active = false;
-            // Restore layer visualization if it's currently active
-            // (moment_active or perm_active might have changed during RGB feedback)
-            if ((perm_active || moment_active) && feature_layer_vis()) {
-                start_perm_display(get_highest_layer(layer_state));
-            }
+            // No restart here: any perm/moment show that was active when the
+            // feedback started simply resumes with its original remaining time
+            // (the overlay is repainted on the activation transition).  The
+            // timer below then expires it as usual.
         }
         return;
     }
@@ -363,7 +362,14 @@ bool layer_visualizer_is_locked(void) {
 
 void rgb_feedback_trigger(void) {
     if (!feature_layer_vis()) return;
-    
+
+    // A layer-visualization show is in progress (timer or moment): keep it.
+    // Without this, an RGB/underglow key on the newly shown layer (e.g. the
+    // FN layers' UG_* keys and UG knob mappings) would cut the display off
+    // for the 1 s feedback window and then restart it — the flicker seen on
+    // some layers.
+    if (perm_active || moment_active) return;
+
     // Just activate RGB feedback mode - don't modify perm_active or moment_active
     // This allows normal state tracking (e.g., FN key release) to work correctly
     rgb_feedback_active = true;
