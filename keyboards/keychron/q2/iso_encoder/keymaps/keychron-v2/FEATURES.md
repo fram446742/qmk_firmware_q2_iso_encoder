@@ -17,6 +17,7 @@ proprietary Raw-HID channel. **All of that is preserved.** Everything below is n
 | Feature | Entry point | Default |
 |---|---|---|
 | **Feature overview** (interactive config screen) | `O + [` by physical position | — |
+| **Layer mode** (pick layers only) | hold the knob button 3 s | — |
 | **Layer visualization** (color-coded key categories) | any layer change / hold `MO` | ON |
 | **Runtime feature flags** | toggled inside overview | mixed (see flags) |
 | **Tap dance** (double-tap = action, transparent override) | config in `keymap_config.h` | OFF |
@@ -95,16 +96,46 @@ Intercepts keys before QMK. Entries match by **keycode** or **matrix position**
 input enabled (Windows `EnableHexNumpad`, Linux IBus, macOS Unicode Hex Input).
 Without it the chords are read as Alt/Ctrl shortcuts.
 
-## Feature-overview entry (physical position — no QMK combos)
+## Feature-overview entry & combos
 
 The overview chord `O + [` is opened by **matrix position** in
 `pre_process_record_user` (`indicators.c: feature_overview_pre_process`) —
-QMK-native combos are disabled (`COMBO_ENABLE = no`, no `combos.c`). Matching
-by physical key rather than keycode means the overview opens from any layer:
-blank layers, layers where `O`/`[` are remapped, even layers where those
-positions produce no keycode at all. The same pre-process hook makes the open
-overview a true modal — every key/encoder event is consumed before auto-shift,
-tap-dance, leader, or any other keycode-based handler can see it.
+never by keycode. Its keys, `O` (1,9) and `[` (1,11), are **reserved**: a
+compile-time enum check rejects any combo that reuses them. Combo support is
+enabled and independent of the chord:
+
+1. **QMK-native** (`COMBO_ENABLE`, `combos.c` `key_combos[]`) — keycode /
+   "software-key" combos. Reserved keys: `KC_O`, `KC_LBRC`.
+2. **Custom position combos** (`features.c` `features_combo_process`) —
+   matrix-position (`POS_KC_*`) or keycode matching. Reserved positions:
+   `POS_KC_O`, `POS_KC_LBRC`.
+
+Chord keys are held back (never registered) until they resolve — partner key →
+overview, release alone → single tap, `OV_CHORD_TERM_MS` elapse or another key
+interrupts → re-pressed normally. The open overview (and layer mode) is a true
+modal consumed in pre-process, so no keycode-based handler can swallow its keys.
+
+## Layer mode (pick layers only)
+
+Hold the knob button (`LAYER_PICKER_HOLD_MS`, default 3 s) → the board goes
+dark and only the **layer LEDs** light. A layer change without the config
+screen. Files: `layer_picker.c` / `layer_picker.h`.
+
+| Key | Action |
+|---|---|
+| `0–8` | `layer_move(N)` (same layer again → default) |
+| Knob rotation | Cycle layers 0–8 |
+| Knob press / any other key | Exit, keep current layer |
+| `Esc` | Exit to the default layer |
+| timeout (`LAYER_PICKER_TIMEOUT_MS`) | Exit, keep current layer |
+
+The knob press is held back too, so the key it is mapped to (e.g. `KC_MUTE`)
+only fires on a short press; the long press never leaks it.
+
+Indicator role colors (current layer, selectable layers, feature ON/OFF,
+caps-lock) are configured together in `keymap_config.h` under
+**OVERLAY ROLE COLORS** — add screens by adding roles there, and keep every
+draw site reading from those macros.
 
 ## Auto-correct
 

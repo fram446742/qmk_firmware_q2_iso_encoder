@@ -24,9 +24,24 @@ static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
 
 // ── O+[ entry chord (tracked by matrix position, see below) ──────────────
+// A chord-key press is HELD BACK (never reaches the normal chain, so nothing
+// is registered) while CH_PENDING.  It resolves to CH_LIVE (re-pressed down,
+// its release then passes through) when: the OV_CHORD_TERM_MS elapses while
+// held, or any other key interrupts (rollover).  If the partner chord key is
+// pressed while this one is still CH_PENDING → the overview opens and neither
+// ever registered.  If it is released while CH_PENDING → replayed as a single
+// tap.  Mirrors QMK native combo timing so typing O and [ normally still works.
 #define OV_CHORD_KEYS 2
-static bool     ov_chord_down[OV_CHORD_KEYS] = {false, false};
-static uint16_t ov_chord_kc[OV_CHORD_KEYS]   = {0, 0};
+enum ov_chord_state { CH_FREE = 0, CH_PENDING, CH_LIVE };
+static uint8_t     ov_state[OV_CHORD_KEYS]  = {CH_FREE, CH_FREE};
+static keyrecord_t ov_pending_rec[OV_CHORD_KEYS];      ///< original press (replay)
+static uint32_t    ov_chord_timer = 0;                 ///< first hold-back time
+
+// ── Indicator role colors (configured in keymap_config.h) ────────────────
+static const uint8_t COL_LAYER_ACTIVE[3] = IND_LAYER_ACTIVE;   // current layer
+static const uint8_t COL_FEATURE_ON[3]   = IND_FEATURE_ON;     // toggle ON
+static const uint8_t COL_FEATURE_OFF[3]  = IND_FEATURE_OFF;    // toggle OFF
+static const uint8_t COL_CAPS_ON[3]      = IND_CAPS_LOCK_ON;   // caps over overlay
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Layer ↔ LED mapping
@@ -78,9 +93,9 @@ void feature_overview_cancel(void) {
     rgb_matrix_config.mode   = saved_rgb_mode;
     rgb_matrix_config.enable = saved_rgb_enabled;
     // Releases of the chord keys were consumed by the modal while overview
-    // was open, so drop the tracked state — never leave stale bits set.
-    ov_chord_down[0] = ov_chord_down[1] = false;
-    ov_chord_kc[0]   = ov_chord_kc[1]   = 0;
+    // was open, so drop the held-back state — never leave stale keys pending.
+    ov_state[0] = ov_state[1] = CH_FREE;
+    ov_chord_timer = 0;
     // Restore a locked layer-visualization overlay that overview paused.
     layer_visualizer_resume();
 }
@@ -194,6 +209,15 @@ static uint8_t ov_chord_index(uint16_t pos) {
     return 0xFF;
 }
 
+/// Re-press a held-back chord key through the normal chain (rollover / term
+/// expiry / single-tap replay).  The original press never registered, so this
+/// sends it down now; the key becomes CH_LIVE and its release passes through.
+static void ov_chord_go_live(uint8_t i) {
+    ov_pending_rec[i].event.time = timer_read();  // fresh time for tap logic
+    process_record(&ov_pending_rec[i]);
+    ov_state[i] = CH_LIVE;
+}
+
 bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record) {
     // ── Overview open → consume everything (press and release) ──────────
     if (overview_active) {
@@ -207,34 +231,64 @@ bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
-    // ── Track the O+[ chord by position ────────────────────────────────
-    uint8_t ci = ov_chord_index(PACK_MTX(record->event.key.row, record->event.key.col));
-    if (ci == 0xFF) return true; // not a chord key — normal processing
+    uint16_t pos = PACK_MTX(record->event.key.row, record->event.key.col);
+    uint8_t  ci  = ov_chord_index(pos);
+
+    // Non-chord key pressed while a chord key is held back → release the held
+    // chord key (rollover) so it registers, then let this key process normally.
+    if (ci == 0xFF) {
+        if (record->event.pressed) {
+            for (uint8_t j = 0; j < OV_CHORD_KEYS; j++) {
+                if (ov_state[j] == CH_PENDING) ov_chord_go_live(j);
+            }
+            ov_chord_timer = 0;
+        }
+        return true;
+    }
 
     if (record->event.pressed) {
-        ov_chord_down[ci] = true;
-        ov_chord_kc[ci]   = keycode; // resolved keycode, to un-type below
-
-        // Second chord key pressed while the first is still held → open.
-        // The first key already went through the normal chain (it may have
-        // registered, e.g. typed 'o'), so send its release so nothing sticks;
-        // the modal consumes every event from here on.
-        for (uint8_t j = 0; j < OV_CHORD_KEYS; j++) {
-            if (j == ci || !ov_chord_down[j]) continue;
-            if (ov_chord_kc[j] != KC_TRNS && ov_chord_kc[j] != KC_NO) {
-                unregister_code16(ov_chord_kc[j]);
-            }
-            ov_chord_down[0] = ov_chord_down[1] = false;
-            ov_chord_kc[0]   = ov_chord_kc[1]   = 0;
+        // Partner still held back (within the chord window) → O+[ chord: open
+        // the overview and consume this press.  Neither key was registered.
+        uint8_t other = 1 - ci;
+        if (ov_state[other] == CH_PENDING) {
+            ov_state[0] = ov_state[1] = CH_FREE;
+            ov_chord_timer = 0;
             feature_overview_trigger();
             return false; // consume the completing press
         }
+        // Otherwise treat this as a fresh chord-key press: hold it back.
+        ov_state[ci]         = CH_PENDING;
+        ov_pending_rec[ci]   = *record;
+        if (ov_chord_timer == 0) ov_chord_timer = timer_read();
+        return false; // consumed — nothing registered yet
     } else {
-        ov_chord_down[ci] = false;
-        ov_chord_kc[ci]   = 0;
+        // Release.
+        if (ov_state[ci] == CH_PENDING) {
+            // No partner → single tap. Replay press + this release now.
+            keyrecord_t up = *record;
+            up.event.time  = timer_read();
+            ov_pending_rec[ci].event.time = timer_read();
+            ov_state[ci] = CH_FREE;
+            process_record(&ov_pending_rec[ci]);
+            process_record(&up);
+            ov_chord_timer = 0;
+            return false; // we owned it; consume
+        }
+        // CH_LIVE (replayed earlier) → let the release pass so the key lifts.
+        ov_state[ci] = CH_FREE;
+        return true;
     }
-    // Single chord key (or its release) — let it act/type normally.
-    return true;
+}
+
+/// Poll (matrix_scan): a chord key held back past OV_CHORD_TERM_MS with no
+/// partner goes live (re-pressed) so normal holding/typing continues.
+void feature_overview_chord_task(void) {
+    if (ov_chord_timer == 0) return;
+    if (timer_elapsed(ov_chord_timer) <= OV_CHORD_TERM_MS) return;
+    for (uint8_t j = 0; j < OV_CHORD_KEYS; j++) {
+        if (ov_state[j] == CH_PENDING) ov_chord_go_live(j);
+    }
+    ov_chord_timer = 0;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -274,9 +328,9 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
         // Active-layer indicator (white)
         uint8_t led = indicator_led_for_layer();
         if (led < RGB_MATRIX_LED_COUNT)
-            overlay_set_color(led, 255, 255, 255);
+            overlay_set_color(led, COL_LAYER_ACTIVE[0], COL_LAYER_ACTIVE[1], COL_LAYER_ACTIVE[2]);
 
-        // Feature indicators (active=white, inactive=red)
+        // Feature indicators (ON = white, OFF = red)
         typedef struct { uint8_t led; bool active; } ind_t;
         ind_t list[] = {
             { IND_AUTO_SHIFT,  feature_auto_shift()                       },
@@ -290,13 +344,14 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
             { IND_VIS_LOCK,    layer_visualizer_is_locked()               },
         };
         for (int i = 0; i < (int)(sizeof(list)/sizeof(list[0])); i++) {
-            overlay_set_color(list[i].led, 255, list[i].active ? 255 : 0, list[i].active ? 255 : 0);
+            const uint8_t *c = list[i].active ? COL_FEATURE_ON : COL_FEATURE_OFF;
+            overlay_set_color(list[i].led, c[0], c[1], c[2]);
         }
 
 #if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
         // Caps Lock stays visible over the dark screen.
         if (!os_ind_cfg.disable.caps_lock && host_keyboard_led_state().caps_lock) {
-            overlay_set_color(CAPS_LOCK_INDEX, 255, 255, 255);
+            overlay_set_color(CAPS_LOCK_INDEX, COL_CAPS_ON[0], COL_CAPS_ON[1], COL_CAPS_ON[2]);
         }
 #endif
         return;

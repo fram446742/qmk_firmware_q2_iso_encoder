@@ -12,14 +12,19 @@
 #include "indicators.h"
 #include "keymap_config.h"
 #include "layer_visualizer.h"
+#include "layer_picker.h"
 
 
 // =============================================================================
 // Feature-overview chord (O + [) — opened by PHYSICAL position in
 // pre_process_record_user (indicators.c: feature_overview_pre_process).
-// QMK-native combos are disabled (rules.mk COMBO_ENABLE = no).
+// QMK-native combos (combos.c) are separate, keycode-matched; the chord keys
+// are reserved and can't be reused by a combo (compile-time check in combos.c).
 // =============================================================================
 
+#ifdef COMBO_ENABLE
+#    include "combos.c"
+#endif
 
 // =============================================================================
 // Leader Key  — multi-key shortcut sequences
@@ -175,12 +180,14 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
         layer_visualizer_mark_user_activity();
     }
 
-    // ── Feature overview is a TRUE modal, handled here by physical position
-    // (indicators.c).  pre_process_record_user runs before every keycode-based
-    // handler in the quantum chain (native combos, auto-shift, tap-dance,
-    // leader, unicode…), so while the overview is open NOTHING can swallow its
-    // keys, and the O+[ entry chord opens from any layer — blank layers
-    // included — regardless of what those positions resolve to.
+    // ── Feature overview & layer-picker are true modals, handled here by
+    // physical position.  pre_process_record_user runs before every keycode-
+    // based handler in the quantum chain (native combos, auto-shift, tap-dance,
+    // leader, unicode…), so while one is open NOTHING can swallow its keys, and
+    // the O+[ entry chord opens from any layer — blank layers included —
+    // regardless of what those positions resolve to.  Layer-picker runs first
+    // (knob long-press), then the feature-overview chord/modal.
+    if (!layer_picker_pre_process(keycode, record)) return false;
     return feature_overview_pre_process(keycode, record);
 }
 
@@ -189,6 +196,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (feature_tap_dance()) {
         if (!features_tap_process(keycode, record)) return false;
     }
+
+    // ── Position combos (custom) — separate from QMK-native (combos.c) and
+    // from the overview chord (pre_process).  Runs here, overview not open.
+    if (!features_combo_process(keycode, record)) return false;
 
     // ── RGB feedback: show RGB state for 1 second after RGB key press ──
     // Detects underglow, RGB matrix, backlight, and LED matrix keycodes.
@@ -247,7 +258,10 @@ static layer_state_t last_default_layer = 0;
 void matrix_scan_user(void) {
     indicator_task();
     layer_visualizer_task();
+    layer_picker_task();
+    feature_overview_chord_task();
     features_tap_task();
+    features_combo_task();
 
     if (last_default_layer != default_layer_state) {
         last_default_layer = default_layer_state;
@@ -279,7 +293,12 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         // The layer-visualization overlay — including the lock — is
         // suspended while overview is open; a locked overlay resumes on
         // exit via layer_visualizer_resume().
-        return true;  // let caps lock (q2.c) draw on top
+        return true; // let caps lock (q2.c) draw on top
+    }
+
+    if (layer_picker_is_active()) {
+        layer_picker_draw();
+        return true;
     }
 
     if (layer_visualizer_is_active()) {

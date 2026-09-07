@@ -55,6 +55,31 @@
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+// OVERLAY ROLE COLORS  —  pick the color of each indicator role here.
+// ═════════════════════════════════════════════════════════════════════════════
+// RGB triplets, used by the feature-overview screen (indicators.c) and the
+// layer-picker / "layer mode" screen (layer_picker.c).  Add roles here as you
+// add screens; keep every draw site reading from these macros, never hardcoded.
+#define IND_LAYER_ACTIVE   {255, 255, 255}  ///< the layer you're on (white)
+#define IND_LAYER_CHOICE   {255, 0, 0}      ///< another layer you can jump to (red)
+#define IND_FEATURE_ON     {255, 255, 255}  ///< a feature toggle that is ON (white)
+#define IND_FEATURE_OFF    {255, 0, 0}      ///< a feature toggle that is OFF (red)
+#define IND_CAPS_LOCK_ON   {255, 255, 255}  ///< caps-lock drawn over the overlay
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYER-PICKER ("layer mode")  —  hold the knob button to switch only layers
+// ═════════════════════════════════════════════════════════════════════════════
+
+#define LAYER_PICKER_HOLD_MS     3000  ///< knob held this long → enter layer mode
+#define LAYER_PICKER_TIMEOUT_MS 10000  ///< auto-exit when idle (0 = none)
+
+// Overview-entry chord (O + [) resolution window — keys are held back (never
+// registered) until this elapses or the second chord key arrives.
+#define OV_CHORD_TERM_MS 60
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 // FEATURE BIT FLAGS  (stored as uint8_t in EEPROM at address EEP_FEATURES)
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -121,6 +146,43 @@ typedef struct __attribute__((packed)) {
     uint8_t  mod;         ///< QMK MOD_* value, not a keycode (e.g. MOD_LGUI = 0x08)
     uint16_t key;         ///< final keycode to fire
 } eeprom_leader_t;
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POSITION COMBO  —  custom processor (features.c), matrix-position matching
+// ═════════════════════════════════════════════════════════════════════════════
+// Base type reuses tap_base_type_t: BASE_IS_KEYCODE (keys[] are KC_*) or
+// BASE_IS_MATRIX (keys[] are POS_KC_* / PACK_MTX).  Independent of QMK-native
+// combos and of the feature-overview chord.  The chord's matrix positions
+// (POS_KC_O / POS_KC_LBRC) are RESERVED: a position combo reusing them fails
+// to compile (duplicate enum member) — keep every new combo's keys in the
+// POS_COMBOS_KEYCHECK list below so the check stays live.
+
+typedef struct {
+    uint8_t  key_count;   ///< number of keys in this combo (1-4)
+    uint8_t  base_type;   ///< tap_base_type_t — keycode vs matrix position
+    uint16_t keys[4];     ///< values to match; unused = 0
+    uint16_t output;      ///< keycode to fire when all keys held
+} pos_combo_def_t;
+
+#define POS_COMBO(count, type, out, ...) \
+    { .key_count = (count), .base_type = (type), .keys = {__VA_ARGS__}, .output = (out) }
+
+// Compile-time guard against reusing the feature-overview chord keys.
+#define CKPOS(p) POSCOMBO_KEYCHECK_##p
+enum pos_combo_reserved_check {
+    CKPOS(POS_KC_O),     // overview chord — reserved
+    CKPOS(POS_KC_LBRC),  // overview chord — reserved
+    // Register every key of each new position combo here too, e.g.:
+    // CKPOS(POS_KC_Q), CKPOS(POS_KC_W),
+    POSCOMBO_KEYCHECK_END,
+};
+#undef CKPOS
+
+// Runtime position-combo definitions (empty by default).  When you add one,
+// ALSO add its keys to pos_combo_reserved_check above.
+#define POS_COMBOS_DEFS \
+    /* POS_COMBO(2, BASE_IS_MATRIX, KC_X, POS_KC_Q, POS_KC_W), */
 
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -20,6 +20,9 @@ void feature_overview_reset_timer(void);
 /// false when the event was consumed (overview open, or chord completed).
 bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record);
 
+/// Poll (matrix_scan): resolve a chord key held past OV_CHORD_TERM_MS alone.
+void feature_overview_chord_task(void);
+
 /// Dispatch one key press while overview is open (feature toggles, layer
 /// jumps, or exit).  Called from feature_overview_pre_process — the key
 /// press is always consumed.

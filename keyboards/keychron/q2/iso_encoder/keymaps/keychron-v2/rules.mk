@@ -13,11 +13,13 @@ DYNAMIC_MACRO_ENABLE = yes
 # Repeat / Alt-Repeat keys
 REPEAT_KEY_ENABLE = yes
 
-# Combos: QMK-native (process_combo) is DISABLED — the feature-overview
-# chord (O + [) is opened by physical matrix position in
-# pre_process_record_user (indicators.c), so it works from any layer
-# regardless of keycode mapping.  No other combos exist.
-COMBO_ENABLE = no
+# Combos — two independent systems:
+#  * QMK-native (COMBO_ENABLE, keycode/"software-key" combos in combos.c).
+#  * Custom position combos (features.c, POS_KC_* matrix positions).
+# The feature-overview chord (O+[ at matrix (1,9)/(1,11)) is separate again:
+# handled by physical position in pre_process_record_user (indicators.c), and
+# its keys are RESERVED — compile-time checks reject any combo that reuses them.
+COMBO_ENABLE = yes
 
 # Long-press auto-shift
 AUTO_SHIFT_ENABLE = yes
@@ -38,6 +40,7 @@ LTO_ENABLE = yes
 SRC += features.c
 SRC += indicators.c
 SRC += layer_visualizer.c
+SRC += layer_picker.c
 
 # Auto-generate autocorrect_data.h + key_positions.h at build time
 DUMMY := $(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)

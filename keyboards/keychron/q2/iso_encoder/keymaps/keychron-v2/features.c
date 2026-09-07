@@ -162,6 +162,86 @@ void features_tap_task(void) {
     }
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Position combo processor  (custom — matrix-position and keycode combos)
+// ═════════════════════════════════════════════════════════════════════════════
+// Independent of QMK-native combos (key_combos[] in combos.c) and of the
+// feature-overview chord (handled by position in pre_process_record_user).
+// Runs from process_record_user; matches keys by matrix position (BASE_IS_MATRIX)
+// or resolved keycode (BASE_IS_KEYCODE).  POS_COMBOS_DEFS is empty by default;
+// the chord keys (1,9)/(1,11) are reserved (compile-time check in
+// keymap_config.h).
+
+static const pos_combo_def_t pos_combos[] = {
+    POS_COMBOS_DEFS
+};
+#define POS_COMBO_COUNT ((uint8_t)(sizeof(pos_combos) / sizeof(pos_combos[0])))
+
+static struct {
+    uint8_t  down;         ///< bitmask of keys currently held
+    uint16_t timer;        ///< time the first key went down
+    bool     fired;        ///< output already sent
+} pos_cb_state[POS_COMBO_COUNT];
+
+bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
+    uint16_t mtx_pos = PACK_MTX(record->event.key.row, record->event.key.col);
+
+    for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+        const pos_combo_def_t *cb = &pos_combos[ci];
+        uint8_t ki;
+        for (ki = 0; ki < cb->key_count; ki++) {
+            bool match = (cb->base_type == BASE_IS_MATRIX) ? (cb->keys[ki] == mtx_pos)
+                                                           : (cb->keys[ki] == keycode);
+            if (match) break;
+        }
+        if (ki >= cb->key_count) continue; // not part of this combo
+
+        uint8_t bit = (1 << ki);
+        if (record->event.pressed) {
+            pos_cb_state[ci].down |= bit;
+            if (pos_cb_state[ci].down == (uint8_t)((1 << cb->key_count) - 1)) {
+                // All keys held → fire.  Route through process_record so a
+                // custom keycode reaches process_record_user().
+                pos_cb_state[ci].fired = true;
+                pos_cb_state[ci].down  = 0;
+                keyrecord_t combo_record = {.event = MAKE_COMBOEVENT(true), .keycode = cb->output};
+                process_record(&combo_record);
+                return false;
+            }
+            if (pos_cb_state[ci].timer == 0) pos_cb_state[ci].timer = timer_read();
+            return false; // consume; timeout re-presses if the combo stalls
+        } else {
+            bool was_fired = pos_cb_state[ci].fired;
+            pos_cb_state[ci].down = pos_cb_state[ci].timer = 0;
+            pos_cb_state[ci].fired                         = false;
+            return !was_fired; // consume releases after firing; else pass through
+        }
+    }
+    return true; // not handled
+}
+
+void features_combo_task(void) {
+    // Timeout: incomplete position combo → re-press held keys as taps.
+    for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+        if (pos_cb_state[ci].down && !pos_cb_state[ci].fired && timer_elapsed(pos_cb_state[ci].timer) > COMBO_TERM) {
+            for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
+                if (pos_cb_state[ci].down & (1 << ki)) {
+                    if (pos_combos[ci].base_type == BASE_IS_MATRIX) {
+                        uint16_t mtx = pos_combos[ci].keys[ki];
+                        uint16_t kc  = dynamic_keymap_get_keycode(get_highest_layer(layer_state), (mtx >> 8) & 0xFF, mtx & 0xFF);
+                        if (kc == KC_TRNS) kc = KC_NO;
+                        tap_code16(kc);
+                    } else {
+                        tap_code16(pos_combos[ci].keys[ki]);
+                    }
+                }
+            }
+            pos_cb_state[ci].down = pos_cb_state[ci].timer = 0;
+        }
+    }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 
 static void feature_apply_flag(uint8_t flag) {

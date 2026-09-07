@@ -48,6 +48,10 @@ typedef struct keyrecord_t keyrecord_t;
 bool features_tap_process(uint16_t keycode, keyrecord_t *record);
 void features_tap_task(void);
 
+// ── Position combos (custom, features.c) — independent of QMK-native combos ──
+bool features_combo_process(uint16_t keycode, keyrecord_t *record);
+void features_combo_task(void);
+
 // ═════════════════════════════════════════════════════════════════════════════
 // EEPROM-backed config arrays  (extern declarations)
 // ═════════════════════════════════════════════════════════════════════════════

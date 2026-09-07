@@ -12,6 +12,7 @@
 #include "keycodes.h"
 #include "keymap_introspection.h"
 #include "dynamic_keymap.h"
+#include "layer_picker.h"
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -448,6 +449,7 @@ void layer_visualizer_draw(void) {
 void layer_visualizer_frame(void) {
     static bool prev_showing = false;
     bool        showing      = feature_overview_is_active()
+                            || layer_picker_is_active()
                             || ((perm_active || moment_active) && !rgb_feedback_active);
 
     if (showing && !prev_showing) {
