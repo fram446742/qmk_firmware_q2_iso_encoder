@@ -184,7 +184,17 @@ void layer_picker_task(void) {
         }
         return;
     }
-    if (knob_pending && timer_elapsed32(knob_press_time) > LAYER_PICKER_HOLD_MS) {
+    if (!knob_pending) return;
+
+    // The knob must STILL be physically held when the timer fires — never enter
+    // layer mode from a released/tap press, even if stale state leaked in.
+    uint8_t kr = (KNOB_POS >> 8) & 0xFF;
+    uint8_t kc = KNOB_POS & 0xFF;
+    if (!matrix_is_on(kr, kc)) {
+        knob_pending = false;   // released before the hold time — nothing to do
+        return;
+    }
+    if (timer_elapsed32(knob_press_time) > LAYER_PICKER_HOLD_MS) {
         knob_pending = false;
         picker_enter();
     }
