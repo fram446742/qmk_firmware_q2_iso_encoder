@@ -16,11 +16,10 @@ proprietary Raw-HID channel. **All of that is preserved.** Everything below is n
 
 | Feature | Entry point | Default |
 |---|---|---|
-| **Feature overview** (interactive config screen) | `O + [` combo | — |
+| **Feature overview** (interactive config screen) | `O + [` by physical position | — |
 | **Layer visualization** (color-coded key categories) | any layer change / hold `MO` | ON |
 | **Runtime feature flags** | toggled inside overview | mixed (see flags) |
 | **Tap dance** (double-tap = action, transparent override) | config in `keymap_config.h` | OFF |
-| **Position-based combos** (works on any layer) | `O + [` fallback | — |
 | **Auto-correct** | compile-time trie from `typos.txt` | OFF |
 | **Leader key** (platform-aware shortcuts) | `FN2 + Q`, then a key | OFF |
 | **Caps Word / Repeat Key / Dynamic Macro / Auto-Shift** | QMK features wired into the flag system | CW+REP ON, rest OFF |
@@ -33,11 +32,15 @@ proprietary Raw-HID channel. **All of that is preserved.** Everything below is n
 ## Feature overview (interactive mode)
 
 `O + [` together enters a dark "config screen" where each feature has an indicator
-LED (white = ON, red = OFF). The chord is matched by the native combo (keycode) with
-a position-based fallback, and the key *dispatch* inside overview is physical-position
-based — so it works, and you can get back out, from any layer, including blank ones.
-Rendered into the same overlay buffer as layer visualization, so it never clears the
-effect's per-key state.
+LED (white = ON, red = OFF). The chord is matched by PHYSICAL matrix position
+(`POS_KC_O` + `POS_KC_LBRC`) in `pre_process_record_user` — never by keycode —
+and the key *dispatch* inside overview is physical-position based too, so it
+works, and you can get back out, from any layer, including blank ones or layers
+where `O`/`[` are remapped to something else. While the overview is open every
+key/encoder event is consumed in pre-process, before any keycode-based handler
+(auto-shift, tap-dance, leader, …) can swallow it. Rendered into the same
+overlay buffer as layer visualization, so it never clears the effect's per-key
+state.
 
 | Key | Action |
 |---|---|
@@ -92,16 +95,16 @@ Intercepts keys before QMK. Entries match by **keycode** or **matrix position**
 input enabled (Windows `EnableHexNumpad`, Linux IBus, macOS Unicode Hex Input).
 Without it the chords are read as Alt/Ctrl shortcuts.
 
-## Combos (two systems, one chord)
+## Feature-overview entry (physical position — no QMK combos)
 
-The feature-overview chord `O + [` is wired twice, deliberately separate:
-
-1. **QMK-native** (`combos.c` `key_combos[]`, `COMBO_ENABLE`) — keycode-matched
-   (`KC_O` + `KC_LBRC`), processed in `pre_process_record_quantum`. Always on, so
-   the overview entry can't be broken by the user combo feature.
-2. **Position-based** (`features.c` `pos_combos[]`, `features_combo_process`) —
-   matrix-position-matched (`POS_KC_*`); the fallback that fires when `O`/`[` are
-   remapped and no longer resolve to `KC_O`/`KC_LBRC`.
+The overview chord `O + [` is opened by **matrix position** in
+`pre_process_record_user` (`indicators.c: feature_overview_pre_process`) —
+QMK-native combos are disabled (`COMBO_ENABLE = no`, no `combos.c`). Matching
+by physical key rather than keycode means the overview opens from any layer:
+blank layers, layers where `O`/`[` are remapped, even layers where those
+positions produce no keycode at all. The same pre-process hook makes the open
+overview a true modal — every key/encoder event is consumed before auto-shift,
+tap-dance, leader, or any other keycode-based handler can see it.
 
 ## Auto-correct
 
@@ -181,7 +184,7 @@ EEPROM reads erased state as `0x00`, not `0xFF`). Layout changes require an EEPR
 |---|---|
 | Tap dance dead | Feature flag OFF — toggle `T` in overview |
 | `€` sends Alt+Tab | OS Unicode input not configured |
-| Combo won't fire | press both keys simultaneously; QMK-native combos need `KC_*`, position combos use `POS_KC_*` |
+| Overview won't open | press `O` + `[` together — matched by physical key, works on any layer |
 | Overview blank | RGB matrix off — enable an effect in VIA |
 | Flags won't save | EEPROM collision — verify 8100 is past VIA macro buffer |
 

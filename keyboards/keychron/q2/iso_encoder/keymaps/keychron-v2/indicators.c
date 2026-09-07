@@ -23,6 +23,11 @@ static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
 
+// ── O+[ entry chord (tracked by matrix position, see below) ──────────────
+#define OV_CHORD_KEYS 2
+static bool     ov_chord_down[OV_CHORD_KEYS] = {false, false};
+static uint16_t ov_chord_kc[OV_CHORD_KEYS]   = {0, 0};
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Layer ↔ LED mapping
 // ═════════════════════════════════════════════════════════════════════════════
@@ -72,6 +77,10 @@ void feature_overview_cancel(void) {
     overview_active = false;
     rgb_matrix_config.mode   = saved_rgb_mode;
     rgb_matrix_config.enable = saved_rgb_enabled;
+    // Releases of the chord keys were consumed by the modal while overview
+    // was open, so drop the tracked state — never leave stale bits set.
+    ov_chord_down[0] = ov_chord_down[1] = false;
+    ov_chord_kc[0]   = ov_chord_kc[1]   = 0;
     // Restore a locked layer-visualization overlay that overview paused.
     layer_visualizer_resume();
 }
@@ -83,10 +92,10 @@ void feature_overview_reset_timer(void) {
 }
 
 // ── Overview key dispatch ────────────────────────────────────────────────
-// Called from process_record_user for every key press while overview is
-// open.  Positions use PACK_MTX (same packing as key_positions.h).
-// Feature keys and the number row keep the overview open (timer reset);
-// any other key exits it.
+// Called from feature_overview_pre_process (pre_process_record_user) for
+// every key press while overview is open.  Positions use PACK_MTX (same
+// packing as key_positions.h).  Feature keys and the number row keep the
+// overview open (timer reset); any other key exits it.
 
 void feature_overview_handle_key(keyrecord_t *record) {
     uint16_t pos = PACK_MTX(record->event.key.row, record->event.key.col);
@@ -160,6 +169,72 @@ void feature_overview_encoder(bool clockwise) {
     uint8_t next = clockwise ? ((current + 1) % 9) : (current == 0 ? 8 : current - 1);
     layer_move(next);
     feature_overview_reset_timer();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Overview entry chord (O + [) + modal — by PHYSICAL matrix position
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Runs from pre_process_record_user (keymap.c), i.e. BEFORE every keycode-
+// based handler in the quantum chain (QMK-native combos are disabled anyway,
+// but also auto-shift, tap-dance, leader, unicode…).  Two consequences:
+//
+//  1. While the overview is open it is a true modal: every key/encoder event
+//     is consumed here, so no feature can swallow overview keys — the number
+//     row switches layers regardless of what those keys mean on the current
+//     layer or which runtime features are enabled.
+//  2. The O+[ entry chord is matched by the keys' matrix positions
+//     (POS_KC_O / POS_KC_LBRC), never by their keycode, so the overview can
+//     be opened from ANY layer — including blank layers where those positions
+//     resolve to nothing.
+
+static uint8_t ov_chord_index(uint16_t pos) {
+    if (pos == POS_KC_O)    return 0;
+    if (pos == POS_KC_LBRC) return 1;
+    return 0xFF;
+}
+
+bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record) {
+    // ── Overview open → consume everything (press and release) ──────────
+    if (overview_active) {
+        if (record->event.pressed) {
+            if (IS_ENCODEREVENT(record->event)) {
+                feature_overview_encoder(record->event.type == ENCODER_CW_EVENT);
+            } else {
+                feature_overview_handle_key(record);
+            }
+        }
+        return false;
+    }
+
+    // ── Track the O+[ chord by position ────────────────────────────────
+    uint8_t ci = ov_chord_index(PACK_MTX(record->event.key.row, record->event.key.col));
+    if (ci == 0xFF) return true; // not a chord key — normal processing
+
+    if (record->event.pressed) {
+        ov_chord_down[ci] = true;
+        ov_chord_kc[ci]   = keycode; // resolved keycode, to un-type below
+
+        // Second chord key pressed while the first is still held → open.
+        // The first key already went through the normal chain (it may have
+        // registered, e.g. typed 'o'), so send its release so nothing sticks;
+        // the modal consumes every event from here on.
+        for (uint8_t j = 0; j < OV_CHORD_KEYS; j++) {
+            if (j == ci || !ov_chord_down[j]) continue;
+            if (ov_chord_kc[j] != KC_TRNS && ov_chord_kc[j] != KC_NO) {
+                unregister_code16(ov_chord_kc[j]);
+            }
+            ov_chord_down[0] = ov_chord_down[1] = false;
+            ov_chord_kc[0]   = ov_chord_kc[1]   = 0;
+            feature_overview_trigger();
+            return false; // consume the completing press
+        }
+    } else {
+        ov_chord_down[ci] = false;
+        ov_chord_kc[ci]   = 0;
+    }
+    // Single chord key (or its release) — let it act/type normally.
+    return true;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

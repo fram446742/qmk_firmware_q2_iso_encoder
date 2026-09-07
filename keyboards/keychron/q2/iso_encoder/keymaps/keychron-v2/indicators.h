@@ -15,9 +15,14 @@ bool feature_overview_is_active(void);
 void feature_overview_cancel(void);
 void feature_overview_reset_timer(void);
 
+/// Overview modal + O+[ entry chord, by PHYSICAL position.  Call from
+/// pre_process_record_user (before any keycode-based handler).  Returns
+/// false when the event was consumed (overview open, or chord completed).
+bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record);
+
 /// Dispatch one key press while overview is open (feature toggles, layer
-/// jumps, or exit).  Call from process_record_user — the key press is
-/// always consumed.
+/// jumps, or exit).  Called from feature_overview_pre_process — the key
+/// press is always consumed.
 void feature_overview_handle_key(keyrecord_t *record);
 
 /// Knob rotation during overview: cycle layers 0-8 (9 is the vis lock, skipped).

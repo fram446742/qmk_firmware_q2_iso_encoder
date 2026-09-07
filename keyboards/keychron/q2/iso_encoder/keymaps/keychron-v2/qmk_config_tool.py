@@ -105,7 +105,7 @@ KC = {  # subset of common QMK keycodes
     0xE2:"KC_LALT",0xE6:"KC_RALT",0xE3:"KC_LGUI",0xE7:"KC_RGUI",
     0x36:"KC_BSLS",0x52:"KC_UP",0x50:"KC_LEFT",0x51:"KC_DOWN",
     0x4F:"KC_RGHT",0xB0:"KC_MUTE",
-    0x7C73:"CW_TOGG",0x5F22:"KC_FEAT_OVERVIEW",
+    0x7C73:"CW_TOGG",
 }
 KC_NAMES = {v:k for k,v in KC.items()}
 

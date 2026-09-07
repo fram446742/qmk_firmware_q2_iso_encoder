@@ -13,8 +13,11 @@ DYNAMIC_MACRO_ENABLE = yes
 # Repeat / Alt-Repeat keys
 REPEAT_KEY_ENABLE = yes
 
-# Combos: multiple simultaneous keys = action
-COMBO_ENABLE = yes
+# Combos: QMK-native (process_combo) is DISABLED — the feature-overview
+# chord (O + [) is opened by physical matrix position in
+# pre_process_record_user (indicators.c), so it works from any layer
+# regardless of keycode mapping.  No other combos exist.
+COMBO_ENABLE = no
 
 # Long-press auto-shift
 AUTO_SHIFT_ENABLE = yes

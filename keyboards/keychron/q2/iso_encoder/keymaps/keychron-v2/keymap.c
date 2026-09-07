@@ -15,12 +15,10 @@
 
 
 // =============================================================================
-// Combos  — #included so keymap_introspection sees the array
+// Feature-overview chord (O + [) — opened by PHYSICAL position in
+// pre_process_record_user (indicators.c: feature_overview_pre_process).
+// QMK-native combos are disabled (rules.mk COMBO_ENABLE = no).
 // =============================================================================
-
-#ifdef COMBO_ENABLE
-#    include "combos.c"
-#endif
 
 
 // =============================================================================
@@ -170,49 +168,26 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // User callbacks  —  feature toggles, indicators, overview, HID handler
 // =============================================================================
 
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // ── Layer visualization: first key press after boot arms the overlay ─
-    // Layer changes before this (boot sync, USB enumeration, Launcher/VIA
-    // connect commands) never start a display.
+bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // First key press after boot arms layer visualization (layer changes from
+    // boot sync / USB enumeration / Launcher-VIA connect never start a show).
     if (record->event.pressed) {
         layer_visualizer_mark_user_activity();
     }
 
-    // ── Interactive overview mode (modal — runs before everything else) ──
-    // While overview is open every key press is consumed by the dispatch in
-    // indicators.c (feature toggles, layer jumps, or exit).  Dispatch is by
-    // physical position (PACK_MTX), and running it first keeps tap-dance and
-    // combos from swallowing overview keys (e.g. the number row, which tap
-    // dance would otherwise intercept).  It also works on blank layers reached
-    // by an earlier layer jump inside overview — no keycode dependency.
-    if (feature_overview_is_active()) {
-        if (record->event.pressed) {
-            if (IS_ENCODEREVENT(record->event)) {
-                // Knob rotation: cycle layers 0-8 (instead of volume/RGB).
-                feature_overview_encoder(record->event.type == ENCODER_CW_EVENT);
-            } else {
-                feature_overview_handle_key(record);
-            }
-        }
-        return false; // consume every key while overview is open
-    }
+    // ── Feature overview is a TRUE modal, handled here by physical position
+    // (indicators.c).  pre_process_record_user runs before every keycode-based
+    // handler in the quantum chain (native combos, auto-shift, tap-dance,
+    // leader, unicode…), so while the overview is open NOTHING can swallow its
+    // keys, and the O+[ entry chord opens from any layer — blank layers
+    // included — regardless of what those positions resolve to.
+    return feature_overview_pre_process(keycode, record);
+}
 
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // ── Tap-dance override ──────────────────────────────────────────────
     if (feature_tap_dance()) {
         if (!features_tap_process(keycode, record)) return false;
-    }
-
-    // ── Position-based combo processor (fallback, after QMK's native combo) ──
-    // Catches chords like O+[ by matrix position so they work on any layer.
-    if (!features_combo_process(keycode, record)) return false;
-
-    // ── Combo-only actions ─────────────────────────────────────────────
-    if (record->event.pressed) {
-        switch (keycode) {
-            case KC_FEAT_OVERVIEW:
-                feature_overview_trigger();
-                return false;
-        }
     }
 
     // ── RGB feedback: show RGB state for 1 second after RGB key press ──
@@ -273,7 +248,6 @@ void matrix_scan_user(void) {
     indicator_task();
     layer_visualizer_task();
     features_tap_task();
-    features_combo_task();
 
     if (last_default_layer != default_layer_state) {
         last_default_layer = default_layer_state;

@@ -52,7 +52,7 @@ quantum/rgb_matrix/rgb_matrix.c                          ← RGB core (modified 
 | `features.h` / `features.c` | Feature-flag API, EEPROM config (tap/combos/leaders), tap-dance state machine, position combos, Raw-HID config protocol |
 | `indicators.h` / `indicators.c` | RGB indicator drawing (caps/num/win lock), feature-overview trigger/state/dispatch |
 | `layer_visualizer.h` / `layer_visualizer.c` | Key-category overlay (timer + momentary MO modes, lock), overlay flush buffer |
-| `combos.c` | QMK-native `key_combos[]` — the always-on feature-overview chord (`O + [`), separate from the position-based fallback in `features.c` |
+| `indicators.c` (pre-process) | Feature-overview modal + `O + [` entry chord by physical position — see `feature_overview_pre_process()` |
 | `autocorrect_data.h` | Auto-generated typo trie (from `typos.txt`) |
 | `key_positions.h` | Auto-generated `POS_KC_*`/`POS_IDX_*` + `led_to_mtx[]` |
 | `typos.txt` | Autocorrect dictionary (source for the trie) |
