@@ -46,7 +46,7 @@ effect's per-key state.
 | `0–8` | `layer_move(N)` (same layer again → default) |
 | `9` | Toggle layer-visualization **lock** |
 | Knob rotation | Cycle layers 0–8 (clockwise = next, CCW = previous) |
-| Knob press | Return to default layer (Mac base = 0, Win base = 1) |
+| Knob press | Exit overview, keep current layer |
 | `Esc` | Back to default layer and exit overview |
 
 
@@ -186,10 +186,10 @@ EEPROM reads erased state as `0x00`, not `0xFF`). Layout changes require an EEPR
 | Flags won't save | EEPROM collision — verify 8100 is past VIA macro buffer |
 
 ### Completed: Encoder-for-layers in overview (2026-09-01)
-- Knob rotation cycles layers 0–8; knob press returns to the default layer; `Esc` returns to the default layer and exits overview
+- Knob rotation cycles layers 0–8; knob press exits overview keeping the current layer; `Esc` resets to the default layer and exits overview
 - Number keys 0–8 jump layers directly (`LAYER_MOVE_OR_DEFAULT` — same layer again → default)
 - Fixed: layer visualization and feature overview regressions — `layer_visualizer_mark_user_activity()` and the tap-dance fence re-instated in `process_record_user`
 ### Completed Features (2026-09-01)
 - Leader sequences: W=close tab, Q=quit, S=save, F=find, A=select all, C=copy, V=paste, X=cut, Z=undo, T=new tab, R=reload, B=bookmarks, N=new window, G=go to line, H=history, D=duplicate, P=print
-- Encoder knob: rotation cycles layers 0-8 during overview; press returns to default layer
+- Encoder knob: rotation cycles layers 0-8 during overview; press exits overview keeping the current layer
 - Per-layer RGB effects: IN PROGRESS — layer-based RGB mode switching (reverted from this turn; will be re-added after design review)

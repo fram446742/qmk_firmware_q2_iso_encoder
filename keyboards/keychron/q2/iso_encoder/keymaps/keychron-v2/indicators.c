@@ -137,8 +137,8 @@ void feature_overview_handle_key(keyrecord_t *record) {
             layer_move(get_highest_layer(default_layer_state));
             feature_overview_cancel();
             return;
-        case POS_KC_MUTE:      // knob button — return to default layer
-            feature_overview_return_default();
+        case POS_KC_MUTE:      // knob button — exit overview, keep current layer
+            feature_overview_cancel();
             break;
         default:               // any other key — exit overview
             feature_overview_cancel();
@@ -149,14 +149,8 @@ void feature_overview_handle_key(keyrecord_t *record) {
 
 // ── Encoder (knob) handling during overview ──────────────────────────────
 // Rotate the knob to cycle layers 0-8 (like the number keys); press the knob
-// to return to the default layer.
-
-void feature_overview_return_default(void) {
-    // Always land on the default layer (Mac base = 0 or Win base = 1),
-    // regardless of the current layer.
-    layer_move(get_highest_layer(default_layer_state));
-    feature_overview_reset_timer();
-}
+// to close the overview and keep the current layer.  (ESC is the exit that
+// resets to the default layer.)
 
 void feature_overview_encoder(bool clockwise) {
     // Cycle 0..8 (9 is the layer-visualization lock, not a layer).

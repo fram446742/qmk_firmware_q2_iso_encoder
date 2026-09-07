@@ -23,9 +23,6 @@ void feature_overview_handle_key(keyrecord_t *record);
 /// Knob rotation during overview: cycle layers 0-8 (9 is the vis lock, skipped).
 void feature_overview_encoder(bool clockwise);
 
-/// Knob button during overview: return to the default layer.
-void feature_overview_return_default(void);
-
 /// Map a layer number to a physical LED index.
 /// Layer 0 → LED 10, layers 1-9 → LED N.  Returns 255 for invalid layers.
 uint8_t layer_to_led(uint8_t layer);
