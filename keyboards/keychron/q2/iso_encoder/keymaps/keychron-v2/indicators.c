@@ -22,10 +22,6 @@ static bool     overview_active   = false;
 static uint32_t overview_start    = 0;
 static uint8_t  saved_rgb_mode    = 0;
 static bool     saved_rgb_enabled = false;
-static uint32_t last_activity = 0;
-void indicator_update_activity(void) {
-   last_activity = timer_read32();
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Layer ↔ LED mapping
@@ -137,6 +133,10 @@ void feature_overview_handle_key(keyrecord_t *record) {
         case PACK_MTX(0, 9):   // 9 — layer-visualization lock
             layer_visualizer_lock_toggle();
             break;
+        case PACK_MTX(0, 0):   // ESC — reset to default layer and exit overview
+            layer_move(get_highest_layer(default_layer_state));
+            feature_overview_cancel();
+            return;
         case POS_KC_MUTE:      // knob button — return to default layer
             feature_overview_return_default();
             break;
@@ -243,18 +243,6 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
 
 
 void indicator_task(void) {
-    // ── Idle RGB dimming ──────────────────────────────────────────────
-    // BROKEN, so disabled for now. The rgb saves feature overview led states and never comes back to the effect.
-    // if (timer_elapsed32(last_activity) > IDLE_DIM_TIMEOUT_MS) {
-    //     saved_rgb_mode    = rgb_matrix_config.mode;
-    //     saved_rgb_enabled = rgb_matrix_config.enable;
-    //     rgb_matrix_sethsv(0, 0, 0.1);  // dim white at 10% brightness
-    // } else if (saved_rgb_enabled) {
-    //     rgb_matrix_config.mode = saved_rgb_mode;
-    //     rgb_matrix_config.enable = saved_rgb_enabled;
-    //     saved_rgb_enabled = false;  // only restore once
-    // }
-
     if (!overview_active) return;
     // When layer-visualization is locked (9 key / 10th indicator), the
     // overview is considered "permanent" — don't auto-exit.  This matches

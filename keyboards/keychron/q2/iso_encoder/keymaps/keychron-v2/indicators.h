@@ -36,5 +36,3 @@ uint8_t indicator_led_for_layer(void);
 
 void indicator_draw(uint8_t led_min, uint8_t led_max);
 void indicator_task(void);
-#define IDLE_DIM_TIMEOUT_MS 300000
-void indicator_update_activity(void);

@@ -54,6 +54,20 @@ void leader_end_user(void) {
         tap_code16(LEADER_MOD(on_mac, KC_Z));
     } else if (leader_sequence_one_key(KC_T)) {
         tap_code16(LEADER_MOD(on_mac, KC_T));
+    } else if (leader_sequence_one_key(KC_R)) {
+        tap_code16(LEADER_MOD(on_mac, KC_R));
+    } else if (leader_sequence_one_key(KC_B)) {
+        tap_code16(LEADER_MOD(on_mac, LSFT(KC_B)));
+    } else if (leader_sequence_one_key(KC_N)) {
+        tap_code16(LEADER_MOD(on_mac, KC_N));
+    } else if (leader_sequence_one_key(KC_G)) {
+        tap_code16(LEADER_MOD(on_mac, KC_G));
+    } else if (leader_sequence_one_key(KC_H)) {
+        tap_code16(LEADER_MOD(on_mac, KC_H));
+    } else if (leader_sequence_one_key(KC_D)) {
+        tap_code16(LEADER_MOD(on_mac, KC_D));
+    } else if (leader_sequence_one_key(KC_P)) {
+        tap_code16(LEADER_MOD(on_mac, KC_P));
     }
 }
 
@@ -164,6 +178,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         layer_visualizer_mark_user_activity();
     }
 
+    // ── Interactive overview mode (modal — runs before everything else) ──
+    // While overview is open every key press is consumed by the dispatch in
+    // indicators.c (feature toggles, layer jumps, or exit).  Dispatch is by
+    // physical position (PACK_MTX), and running it first keeps tap-dance and
+    // combos from swallowing overview keys (e.g. the number row, which tap
+    // dance would otherwise intercept).  It also works on blank layers reached
+    // by an earlier layer jump inside overview — no keycode dependency.
+    if (feature_overview_is_active()) {
+        if (record->event.pressed) {
+            if (IS_ENCODEREVENT(record->event)) {
+                // Knob rotation: cycle layers 0-8 (instead of volume/RGB).
+                feature_overview_encoder(record->event.type == ENCODER_CW_EVENT);
+            } else {
+                feature_overview_handle_key(record);
+            }
+        }
+        return false; // consume every key while overview is open
+    }
+
     // ── Tap-dance override ──────────────────────────────────────────────
     if (feature_tap_dance()) {
         if (!features_tap_process(keycode, record)) return false;
@@ -172,14 +205,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // ── Position-based combo processor (fallback, after QMK's native combo) ──
     // Catches chords like O+[ by matrix position so they work on any layer.
     if (!features_combo_process(keycode, record)) return false;
-
-    // ── Interactive overview mode ───────────────────────────────────────
-    // While overview is open every key press is consumed by the dispatch
-    // in indicators.c (feature toggles, layer jumps, or exit).
-    if (record->event.pressed && feature_overview_is_active()) {
-        feature_overview_handle_key(record);
-        return false;
-    }
 
     // ── Combo-only actions ─────────────────────────────────────────────
     if (record->event.pressed) {
@@ -267,6 +292,12 @@ void matrix_scan_user(void) {
 
 #if defined(RGB_MATRIX_ENABLE)
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    // Flips the driver's flush override while the overlay (layer visualization
+    // OR feature overview) is showing, so its pixels — not the effect's
+    // pwm_buffer — are displayed.  Runs before the indicators so they survive
+    // the overlay deactivation clear.
+    layer_visualizer_frame();
+
     indicator_draw(led_min, led_max);
 
     if (feature_overview_is_active()) {
