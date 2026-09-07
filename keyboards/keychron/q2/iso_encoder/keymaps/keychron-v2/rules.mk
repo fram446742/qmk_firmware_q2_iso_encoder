@@ -36,11 +36,12 @@ UNICODE_ENABLE = yes
 # Link-time optimization — reduces flash usage
 LTO_ENABLE = yes
 
-# Custom modules for this keymap (feature toggles, indicators)
-SRC += features.c
-SRC += indicators.c
-SRC += layer_visualizer.c
-SRC += layer_picker.c
+# Custom modules — one per feature (hook pattern: *_pre_process/*_task/*_draw)
+SRC += features.c            # feature flags, tap overrides, position combos, HID config
+SRC += indicators.c          # normal-state caps-lock LED + layer↔LED map
+SRC += feature_overview.c    # O+[ config screen (modal + entry chord)
+SRC += layer_picker.c        # knob long-press layer mode
+SRC += layer_visualizer.c    # key-category overlay + overlay flush manager
 
 # Auto-generate autocorrect_data.h + key_positions.h at build time
 DUMMY := $(shell $(QMK_BIN) generate-autocorrect-data $(KEYMAP_PATH)/typos.txt -o $(KEYMAP_PATH)/autocorrect_data.h 2>/dev/null)

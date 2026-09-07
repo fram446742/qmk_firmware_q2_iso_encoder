@@ -4,7 +4,8 @@
 #include QMK_KEYBOARD_H
 #include "keymap_config.h"
 #include "layer_picker.h"
-#include "indicators.h"       // layer_to_led(), feature_overview_encoder()
+#include "feature_overview.h" // feature_overview_is_active()/encoder()
+#include "indicators.h"       // layer_to_led()
 #include "layer_visualizer.h" // overlay_clear_all()/overlay_set_color()
 #include "keychron_common.h"
 
@@ -37,6 +38,12 @@ static const uint8_t COL_CHOICE[3] = IND_LAYER_CHOICE; // other layers
 
 static void picker_enter(void) {
     if (picker_active) return;
+    // A fresh long-press must always require a fresh 3 s hold: drop any stale
+    // hold-detection state from a previous session.
+    knob_pending    = false;
+    knob_live       = false;
+    knob_press_time = 0;
+
     saved_rgb_mode  = rgb_matrix_config.mode;
     saved_rgb_on    = rgb_matrix_config.enable;
     layer_visualizer_cancel();            // pause any layer-viz overlay
@@ -54,6 +61,8 @@ static void picker_restore_rgb(void) {
 static void picker_exit_keep(void) {
     if (!picker_active) return;
     picker_active = false;
+    knob_pending  = false;
+    knob_live     = false;
     picker_restore_rgb();
 }
 
@@ -134,12 +143,12 @@ bool layer_picker_pre_process(uint16_t keycode, keyrecord_t *record) {
 
     if (pos == KNOB_POS) {
         if (record->event.pressed) {
-            if (!knob_pending) {
-                knob_pending     = true;
-                knob_live        = false;
-                knob_press_rec   = *record;
-                knob_press_time  = timer_read();
-            }
+            // Always re-arm: even if a stale pending state leaked, a fresh
+            // press must need a fresh LAYER_PICKER_HOLD_MS hold.
+            knob_pending     = true;
+            knob_live        = false;
+            knob_press_rec   = *record;
+            knob_press_time  = timer_read();
             return false;  // hold back — nothing registered yet
         } else {
             if (knob_pending) {

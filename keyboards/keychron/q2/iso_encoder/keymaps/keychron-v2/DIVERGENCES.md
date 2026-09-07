@@ -45,14 +45,15 @@ quantum/rgb_matrix/rgb_matrix.c                          ← RGB core (modified 
 
 | File | Role |
 |---|---|
-| `keymap.c` | Layers, encoder map, `pre_process_record_user` (overview + layer-mode modal), `process_record_user`, `layer_state_set_user`, `matrix_scan_user`, `rgb_matrix_indicators_advanced_user` |
+| `keymap.c` | Layers, encoder map, and the wiring file: `pre_process_record_user` / `matrix_scan_user` / `rgb_matrix_indicators_advanced_user` dispatch to the per-feature modules |
 | `keymap_config.h` | **Single config**: timings, layers, LED indices, overlay role colors, EEPROM layout, feature defaults |
 | `config.h` | VIA layer/macro limits, `WINLOCK_LED_LIST` (Num Lock indicator disabled) — kept here so keyboard `config.h` stays vendor-identical |
 | `rules.mk` | Feature enables + `SRC +=` + build-time generators |
 | `features.h` / `features.c` | Feature-flag API, EEPROM config (tap/combos/leaders), tap-dance state machine, position combos, Raw-HID config protocol |
-| `indicators.h` / `indicators.c` | RGB indicator drawing (caps/win lock), feature-overview trigger/state/dispatch, `O + [` entry chord by physical position |
+| `indicators.h` / `indicators.c` | Normal-state caps-lock LED (pwm path) + shared layer↔LED map (`layer_to_led`) |
+| `feature_overview.h` / `feature_overview.c` | Feature-overview screen: state, `O + [` entry chord by physical position, modal dispatch, grid draw, idle timeout |
 | `layer_picker.h` / `layer_picker.c` | "Layer mode" — knob long-press picker (layers-only modal), own dispatch + draw |
-| `layer_visualizer.h` / `layer_visualizer.c` | Key-category overlay (timer + momentary MO modes, lock), overlay flush buffer |
+| `layer_visualizer.h` / `layer_visualizer.c` | Key-category overlay (timer + momentary MO modes, lock) + overlay flush manager (`layer_visualizer_frame`) |
 | `combos.c` | QMK-native keycode combos (`key_combos[]`, `COMBO_ENABLE`) — reserved-key check vs the overview chord |
 | `autocorrect_data.h` | Auto-generated typo trie (from `typos.txt`) |
 | `key_positions.h` | Auto-generated `POS_KC_*`/`POS_IDX_*` + `led_to_mtx[]` |

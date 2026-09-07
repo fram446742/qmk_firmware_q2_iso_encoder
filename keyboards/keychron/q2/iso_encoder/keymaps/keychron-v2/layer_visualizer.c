@@ -8,7 +8,7 @@
 #include "rgb_matrix_drivers.h"
 #include "keymap_config.h"
 #include "features.h"
-#include "indicators.h"
+#include "feature_overview.h"
 #include "keycodes.h"
 #include "keymap_introspection.h"
 #include "dynamic_keymap.h"

@@ -10,6 +10,7 @@
 #include "keychron_common.h"
 #include "features.h"
 #include "indicators.h"
+#include "feature_overview.h"
 #include "keymap_config.h"
 #include "layer_visualizer.h"
 #include "layer_picker.h"
@@ -256,9 +257,11 @@ void keyboard_post_init_user(void) {
 static layer_state_t last_default_layer = 0;
 
 void matrix_scan_user(void) {
-    indicator_task();
-    layer_visualizer_task();
+    // Per-module polls.  Hook pattern: every modal screen owns a *_task()
+    // (idle/timeout) and a *_pre_process() / draw used by the hooks below.
+    feature_overview_task();
     layer_picker_task();
+    layer_visualizer_task();
     feature_overview_chord_task();
     features_tap_task();
     features_combo_task();
@@ -280,30 +283,29 @@ void matrix_scan_user(void) {
 
 #if defined(RGB_MATRIX_ENABLE)
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    // Flips the driver's flush override while the overlay (layer visualization
-    // OR feature overview) is showing, so its pixels — not the effect's
-    // pwm_buffer — are displayed.  Runs before the indicators so they survive
-    // the overlay deactivation clear.
+    // Flips the driver's flush override while an overlay screen (feature
+    // overview, layer mode, or layer visualization) is showing, so its pixels
+    // — not the effect's pwm_buffer — are displayed.  Runs first so the
+    // per-screen draws below go into the overlay buffer and survive the
+    // overlay deactivation clear.
     layer_visualizer_frame();
 
-    indicator_draw(led_min, led_max);
-
+    // ── Modal screens own the whole board ──────────────────────────────
     if (feature_overview_is_active()) {
-        // Overview screen: indicator LEDs only (drawn by indicator_draw).
-        // The layer-visualization overlay — including the lock — is
-        // suspended while overview is open; a locked overlay resumes on
-        // exit via layer_visualizer_resume().
-        return true; // let caps lock (q2.c) draw on top
+        feature_overview_draw();
+        return true;
     }
-
     if (layer_picker_is_active()) {
         layer_picker_draw();
         return true;
     }
 
+    // ── Normal state ───────────────────────────────────────────────────
+    indicator_draw(led_min, led_max);  // caps-lock into the effect buffer
+
     if (layer_visualizer_is_active()) {
         layer_visualizer_draw();
-        return true;  // let caps lock (q2.c) draw on top
+        return true;
     }
 
     return true;
