@@ -109,6 +109,9 @@ enum { KC_FEAT_OVERVIEW = NEW_SAFE_RANGE };
 #define LAYER_PICKER_HOLD_MS     3000
 // Auto-exit when the picker is left idle.  0 = never auto-exit.
 #define LAYER_PICKER_TIMEOUT_MS 10000
+// Gap (ms) between the replayed press and release of a short knob tap, so the
+// host sees a distinct media-key press (e.g. mute) instead of a collapsed one.
+#define KNOB_TAP_RELEASE_DELAY_MS 6
 
 // (The knob button's physical key is held back too, so the key mapped to it —
 // e.g. KC_MUTE — only fires on a short press; a long press never leaks it.)

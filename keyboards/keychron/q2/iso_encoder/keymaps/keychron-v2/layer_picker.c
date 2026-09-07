@@ -155,11 +155,16 @@ bool layer_picker_pre_process(uint16_t keycode, keyrecord_t *record) {
         } else {
             if (knob_pending) {
                 // Short press → replay the mapped key as a single tap.
+                // Send the press, let the report transmit, then release —
+                // otherwise down+up in the same instant can collapse on the
+                // host and the media key (e.g. mute) never toggles.
                 knob_pending = false;
+                keyrecord_t down = knob_press_rec;
+                down.event.time  = timer_read();
+                process_record(&down);
+                wait_ms(KNOB_TAP_RELEASE_DELAY_MS);
                 keyrecord_t up = *record;
-                up.event.time  = timer_read();
-                knob_press_rec.event.time = timer_read();
-                process_record(&knob_press_rec);
+                up.event.time   = timer_read();
                 process_record(&up);
                 return false; // owned it; consume
             }
