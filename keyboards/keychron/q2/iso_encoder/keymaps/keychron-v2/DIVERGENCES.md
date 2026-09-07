@@ -47,7 +47,7 @@ quantum/rgb_matrix/rgb_matrix.c                          ← RGB core (modified 
 |---|---|
 | `keymap.c` | Layers, encoder map, `process_record_user`, `layer_state_set_user`, `matrix_scan_user`, `rgb_matrix_indicators_advanced_user` |
 | `keymap_config.h` | **Single config**: timings, layers, keycodes, combos, LED indices, EEPROM layout, feature defaults |
-| `config.h` | VIA layer/macro limits, `NUM_LOCK_INDEX`/`WINLOCK_LED_LIST` (kept here so keyboard `config.h` stays vendor-identical) |
+| `config.h` | VIA layer/macro limits, `WINLOCK_LED_LIST` (Num Lock indicator disabled) — kept here so keyboard `config.h` stays vendor-identical |
 | `rules.mk` | Feature enables + `SRC +=` + build-time generators |
 | `features.h` / `features.c` | Feature-flag API, EEPROM config (tap/combos/leaders), tap-dance state machine, position combos, Raw-HID config protocol |
 | `indicators.h` / `indicators.c` | RGB indicator drawing (caps/num/win lock), feature-overview trigger/state/dispatch |

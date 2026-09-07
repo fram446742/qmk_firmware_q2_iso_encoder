@@ -25,7 +25,7 @@ proprietary Raw-HID channel. **All of that is preserved.** Everything below is n
 | **Leader key** (platform-aware shortcuts) | `FN2 + Q`, then a key | OFF |
 | **Caps Word / Repeat Key / Dynamic Macro / Auto-Shift** | QMK features wired into the flag system | CW+REP ON, rest OFF |
 | **NKRO toggle** | overview `N` | — |
-| **Caps/Num/Win-Lock indicators** (Launcher-visible) | `NUM_LOCK_INDEX`/`WINLOCK_LED_LIST` | — |
+| **Caps/Win-Lock indicators** (Launcher-visible) | `WINLOCK_LED_LIST` (Num Lock disabled) | — |
 | **Config export/import over Raw HID** | `qmk_config_tool.py` | — |
 
 ---
@@ -47,6 +47,7 @@ effect's per-key state.
 | `9` | Toggle layer-visualization **lock** |
 | Knob rotation | Cycle layers 0–8 (clockwise = next, CCW = previous) |
 | Knob press | Return to default layer (Mac base = 0, Win base = 1) |
+| `Esc` | Back to default layer and exit overview |
 
 
 | `L` | Leader sequences (W=close tab, Q=quit, S=save, F=find, A=select all, C=copy, V=paste, X=cut, Z=undo, R=reload, B=bookmarks, N=new window, G=go to line, H=history, D=duplicate, P=print) |
@@ -120,11 +121,11 @@ they appear as toggles in the **Keychron Launcher**:
 | Indicator | Physical key | LED | Launcher toggle |
 |---|---|---|---|
 | Caps Lock | Caps | 28 | Caps Lock |
-| Num Lock | Del | 27 | Num Lock |
 | Win Lock | Left Option (Win) | 58 | Win Lock (`no_gui`) |
 
-Enabled by `#define`s in the keymap `config.h` (`NUM_LOCK_INDEX`, `WINLOCK_LED_LIST`);
-caps lock stays in the keyboard `config.h` matching the vendor. Win Lock lights red
+Enabled by `#define`s in the keymap `config.h` (`WINLOCK_LED_LIST`); caps lock stays
+in the keyboard `config.h` matching the vendor. The Num Lock indicator is disabled
+(`NUM_LOCK_INDEX` commented out — no numpad on the Q2). Win Lock lights red
 only while the Win key is **locked**, not merely while Windows is the active OS mode.
 
 Known vendor bug (not fixed here): `keychron_rgb.c:os_state_indicate()` checks
@@ -184,12 +185,11 @@ EEPROM reads erased state as `0x00`, not `0xFF`). Layout changes require an EEPR
 | Overview blank | RGB matrix off — enable an effect in VIA |
 | Flags won't save | EEPROM collision — verify 8100 is past VIA macro buffer |
 
-### Completed: Idle Dimming (2026-09-01)
-- After 5 minutes of no keypress (`last_activity` timer), RGB dims to 10% white
-- Wakes and restores previous mode on any keypress
-- `indicator_update_activity()` called in `process_record_user`; checked in `indicator_task`
+### Completed: Encoder-for-layers in overview (2026-09-01)
+- Knob rotation cycles layers 0–8; knob press returns to the default layer; `Esc` returns to the default layer and exits overview
+- Number keys 0–8 jump layers directly (`LAYER_MOVE_OR_DEFAULT` — same layer again → default)
+- Fixed: layer visualization and feature overview regressions — `layer_visualizer_mark_user_activity()` and the tap-dance fence re-instated in `process_record_user`
 ### Completed Features (2026-09-01)
 - Leader sequences: W=close tab, Q=quit, S=save, F=find, A=select all, C=copy, V=paste, X=cut, Z=undo, T=new tab, R=reload, B=bookmarks, N=new window, G=go to line, H=history, D=duplicate, P=print
 - Encoder knob: rotation cycles layers 0-8 during overview; press returns to default layer
-- Idle dimming: 5 min timeout (`IDLE_DIM_TIMEOUT_MS`); dims to 10% white; wakes on any keypress (`last_activity` tracked in `process_record_user`)
 - Per-layer RGB effects: IN PROGRESS — layer-based RGB mode switching (reverted from this turn; will be re-added after design review)
