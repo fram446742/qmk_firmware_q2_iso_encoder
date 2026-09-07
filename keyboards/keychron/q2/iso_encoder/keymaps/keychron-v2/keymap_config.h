@@ -92,9 +92,10 @@ enum layers {
 // only match the resolved keycode); documented in DIVERGENCES.md §4.x.
 //
 // The combo fires KC_FEAT_OVERVIEW, which the keymap's process_record_user()
-// maps to feature_overview_trigger().  COMBO_TERM (QMK default 50 ms) governs
-// the chord window; an incomplete single key is re-pressed so typing O / [
-// alone still works.
+// maps to feature_overview_trigger().  COMBO_TERM governs the chord window —
+// overridden to 150 ms in config.h (QMK's 50 ms default was too short for a
+// deliberate chord: O+[ presses farther apart missed and got typed instead).
+// An incomplete single key is re-pressed so typing O / [ alone still works.
 
 // Custom keycode fired by the overview position combo (§8).  The keymap maps
 // it to feature_overview_trigger().
@@ -106,7 +107,7 @@ enum { KC_FEAT_OVERVIEW = NEW_SAFE_RANGE };
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 // Knob button held this long (ms) → enter layer mode (only layer LEDs light).
-#define LAYER_PICKER_HOLD_MS     3000
+#define LAYER_PICKER_HOLD_MS     1500
 // Auto-exit when the picker is left idle.  0 = never auto-exit.
 #define LAYER_PICKER_TIMEOUT_MS 10000
 // Gap (ms) between the replayed press and release of a short knob tap, so the

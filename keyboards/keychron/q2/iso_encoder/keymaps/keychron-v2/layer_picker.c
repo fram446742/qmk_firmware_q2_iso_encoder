@@ -24,7 +24,6 @@ static bool     saved_rgb_on    = false;
 // replayed as a tap; held past LAYER_PICKER_HOLD_MS → layer mode.
 static bool        knob_pending   = false;  ///< press held back (not registered)
 static bool        knob_live      = false;  ///< press replayed; release must pass
-static keyrecord_t knob_press_rec;
 static uint16_t    knob_press_kc  = KC_NO;  ///< mapped keycode captured at press
 static uint32_t    knob_press_time = 0;
 
@@ -125,6 +124,16 @@ static void knob_replay_down(void) {
     knob_live = true;
 }
 
+/// Fire the knob's mapped key as a single tap (e.g. KC_MUTE).  register +
+/// wait + unregister keeps the media-key press distinct on the host (a bare
+/// down+up through the event chain was being collapsed/dropped).
+static void knob_tap_fire(void) {
+    if (knob_press_kc == KC_NO || knob_press_kc == KC_TRNS) return;
+    register_code16(knob_press_kc);
+    wait_ms(KNOB_TAP_RELEASE_DELAY_MS);
+    unregister_code16(knob_press_kc);
+}
+
 bool layer_picker_pre_process(uint16_t keycode, keyrecord_t *record) {
     // Feature overview owns the modal while it's open — the knob press there
     // is the overview's exit, not a long-press candidate.
@@ -152,20 +161,16 @@ bool layer_picker_pre_process(uint16_t keycode, keyrecord_t *record) {
             knob_pending     = true;
             knob_live        = false;
             knob_press_kc    = keycode;   // mapped key, e.g. KC_MUTE
-            knob_press_rec   = *record;
-            knob_press_time  = timer_read();
+            knob_press_time  = timer_read32();
             return false;  // hold back — nothing registered yet
         } else {
             if (knob_pending) {
-                // Short press → tap the mapped key directly.  register + wait
-                // + unregister guarantees a distinct media-key press reaches
-                // the host (down+up via the event chain was being dropped).
+                // Quick release.  Normally layer_picker_task already fired the
+                // tap and cleared this flag (it runs before the release event
+                // dispatches); this is a defensive fallback for any ordering
+                // where it didn't.  Either way the tap fires exactly once.
                 knob_pending = false;
-                if (knob_press_kc != KC_NO && knob_press_kc != KC_TRNS) {
-                    register_code16(knob_press_kc);
-                    wait_ms(KNOB_TAP_RELEASE_DELAY_MS);
-                    unregister_code16(knob_press_kc);
-                }
+                knob_tap_fire();
                 return false; // owned it; consume
             }
             knob_live = false; // was replayed; let the real release pass
@@ -194,7 +199,13 @@ void layer_picker_task(void) {
     uint8_t kr = (KNOB_POS >> 8) & 0xFF;
     uint8_t kc = KNOB_POS & 0xFF;
     if (!matrix_is_on(kr, kc)) {
-        knob_pending = false;   // released before the hold time — nothing to do
+        // Released before the hold time → a quick tap.  Fire the mapped key
+        // HERE, not from the release event: this task runs inside matrix_scan
+        // (after the debounce has already flipped the state up) but BEFORE the
+        // release event is dispatched, so the release handler would only ever
+        // see knob_pending == false and the tap would never fire.
+        knob_pending = false;
+        knob_tap_fire();
         return;
     }
     if (timer_elapsed32(knob_press_time) > LAYER_PICKER_HOLD_MS) {

@@ -5,6 +5,14 @@
 // VIA overrides — must be visible early in the build (before QMK_KEYBOARD_H).
 // All other feature config lives in keymap_config.h (included from .c files).
 
+// Feature-overview chord window (O + [ position combo, features.c).
+// QMK's default COMBO_TERM is 50 ms — too short for a deliberate two-key
+// chord: O+[ pressed more than 50 ms apart misses, and the keys get typed
+// ('o' / '[') instead of opening the overview.  150 ms makes the chord
+// reliable; quick single taps are unaffected (they fire on release, not at
+// the term).  Only the O+[ combo exists, so no other combo is affected.
+#define COMBO_TERM 150
+
 // This is the maximum allowed by QMK's dynamic keymap system (DYNAMIC_KEYMAP_LAYER_COUNT is a uint8_t).  The actual limit is the number of MO keys in the keymap, which is 8. The default is 5.
 #undef  DYNAMIC_KEYMAP_LAYER_COUNT
 #define DYNAMIC_KEYMAP_LAYER_COUNT 9
