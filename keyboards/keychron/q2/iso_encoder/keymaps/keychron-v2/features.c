@@ -177,12 +177,25 @@ static const pos_combo_def_t pos_combos[] = {
     POS_COMBOS_DEFS
 };
 #define POS_COMBO_COUNT ((uint8_t)(sizeof(pos_combos) / sizeof(pos_combos[0])))
+#define POS_COMBO_MAX_KEYS 4
 
 static struct {
-    uint8_t  down;         ///< bitmask of keys currently held
+    uint8_t  down;         ///< bitmask of keys currently held (being tracked)
     uint16_t timer;        ///< time the first key went down
     bool     fired;        ///< output already sent
+    uint8_t  live;         ///< bitmask of members re-pressed as a held key
+    uint16_t live_kc[POS_COMBO_MAX_KEYS];  ///< keycode each live member was registered with
 } pos_cb_state[POS_COMBO_COUNT];
+
+/// Resolve the keycode a combo member should (re)produce, on the current layer.
+static uint16_t combo_member_kc(const pos_combo_def_t *cb, uint8_t ki) {
+    if (cb->base_type == BASE_IS_MATRIX) {
+        uint16_t mtx = cb->keys[ki];
+        uint16_t kc  = dynamic_keymap_get_keycode(get_highest_layer(layer_state), (mtx >> 8) & 0xFF, mtx & 0xFF);
+        return (kc == KC_TRNS) ? KC_NO : kc;
+    }
+    return cb->keys[ki];
+}
 
 bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
     uint16_t mtx_pos = PACK_MTX(record->event.key.row, record->event.key.col);
@@ -199,46 +212,81 @@ bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
 
         uint8_t bit = (1 << ki);
         if (record->event.pressed) {
+            // (Re-)arm after a previous full chord.
+            if (pos_cb_state[ci].fired && pos_cb_state[ci].down == 0) pos_cb_state[ci].fired = false;
+
             pos_cb_state[ci].down |= bit;
             if (pos_cb_state[ci].down == (uint8_t)((1 << cb->key_count) - 1)) {
                 // All keys held → fire.  Route through process_record so a
                 // custom keycode reaches process_record_user().
                 pos_cb_state[ci].fired = true;
                 pos_cb_state[ci].down  = 0;
+                pos_cb_state[ci].timer = 0;
                 keyrecord_t combo_record = {.event = MAKE_COMBOEVENT(true), .keycode = cb->output};
                 process_record(&combo_record);
                 return false;
             }
             if (pos_cb_state[ci].timer == 0) pos_cb_state[ci].timer = timer_read();
-            return false; // consume; timeout re-presses if the combo stalls
+            return false; // consumed — held back until the chord resolves
         } else {
-            bool was_fired = pos_cb_state[ci].fired;
-            pos_cb_state[ci].down = pos_cb_state[ci].timer = 0;
-            pos_cb_state[ci].fired                         = false;
-            return !was_fired; // consume releases after firing; else pass through
+            // ── Release ──
+            if (pos_cb_state[ci].fired) {
+                // Combo already fired; its opens are consumed by the modal.
+                pos_cb_state[ci].down = pos_cb_state[ci].timer = 0;
+                return false;
+            }
+            if (pos_cb_state[ci].live & bit) {
+                // Member was re-pressed as a held key (timeout) — lift it now.
+                unregister_code16(pos_cb_state[ci].live_kc[ki]);
+                pos_cb_state[ci].live &= ~bit;
+                return false; // consumed; we owned this member
+            }
+            // Never fired and not live → a single quick key.  We consumed its
+            // press, so replay it now (down+up) or the tap would be lost.
+            bool was_only = (pos_cb_state[ci].down == bit);
+            pos_cb_state[ci].down &= ~bit;
+            if (pos_cb_state[ci].down == 0) pos_cb_state[ci].timer = 0;
+            if (was_only) {
+                uint16_t kc = combo_member_kc(cb, ki);
+                if (kc != KC_NO && kc != KC_TRNS) tap_code16(kc);
+            }
+            return false; // consumed; we owned this member
         }
     }
     return true; // not handled
 }
 
-void features_combo_task(void) {
-    // Timeout: incomplete position combo → re-press held keys as taps.
+/// Drop all combo tracking (call when a modal screen opens — it will consume
+/// the releases, so stale "down/fired/live" must not survive).
+void features_combo_clear(void) {
     for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
-        if (pos_cb_state[ci].down && !pos_cb_state[ci].fired && timer_elapsed(pos_cb_state[ci].timer) > COMBO_TERM) {
-            for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
-                if (pos_cb_state[ci].down & (1 << ki)) {
-                    if (pos_combos[ci].base_type == BASE_IS_MATRIX) {
-                        uint16_t mtx = pos_combos[ci].keys[ki];
-                        uint16_t kc  = dynamic_keymap_get_keycode(get_highest_layer(layer_state), (mtx >> 8) & 0xFF, mtx & 0xFF);
-                        if (kc == KC_TRNS) kc = KC_NO;
-                        tap_code16(kc);
-                    } else {
-                        tap_code16(pos_combos[ci].keys[ki]);
-                    }
-                }
-            }
-            pos_cb_state[ci].down = pos_cb_state[ci].timer = 0;
+        for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
+            if (pos_cb_state[ci].live & (1 << ki)) unregister_code16(pos_cb_state[ci].live_kc[ki]);
         }
+        pos_cb_state[ci].down  = 0;
+        pos_cb_state[ci].timer = 0;
+        pos_cb_state[ci].fired = false;
+        pos_cb_state[ci].live  = 0;
+    }
+}
+
+void features_combo_task(void) {
+    // A member still held past COMBO_TERM with no partner → re-press it as a
+    // held key (register down) so holding/auto-repeat behaves like typing it.
+    for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+        if (!pos_cb_state[ci].down || pos_cb_state[ci].fired) continue;
+        if (timer_elapsed(pos_cb_state[ci].timer) <= COMBO_TERM) continue;
+        for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
+            uint8_t bit = (1 << ki);
+            if (!(pos_cb_state[ci].down & bit)) continue;
+            uint16_t kc = combo_member_kc(&pos_combos[ci], ki);
+            if (kc == KC_NO || kc == KC_TRNS) continue;
+            register_code16(kc);
+            pos_cb_state[ci].live |= bit;
+            pos_cb_state[ci].live_kc[ki] = kc;
+            pos_cb_state[ci].down &= ~bit;
+        }
+        if (pos_cb_state[ci].down == 0) pos_cb_state[ci].timer = 0;
     }
 }
 

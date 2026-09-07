@@ -98,22 +98,35 @@ Without it the chords are read as Alt/Ctrl shortcuts.
 
 ## Feature-overview entry & combos
 
-The overview chord `O + [` is opened by **matrix position** in
-`pre_process_record_user` (`indicators.c: feature_overview_pre_process`) —
-never by keycode. Its keys, `O` (1,9) and `[` (1,11), are **reserved**: a
-compile-time enum check rejects any combo that reuses them. Combo support is
-enabled and independent of the chord:
+The overview chord `O + [` is a **POSITION combo**: it is matched by PHYSICAL
+matrix position (`POS_KC_O` = (1,9), `POS_KC_LBRC` = (1,11)) — never by
+keycode — so it opens from any layer, including blank ones where the keys
+resolve to nothing. Implementation: the overview entry is the first row of
+`POS_COMBOS_DEFS` in `keymap_config.h` (§8), handled by the custom position
+combo processor `features_combo_process()` (features.c), which runs in
+`pre_process_record_user` (before auto-shift/tap-dance/leader can swallow a
+key). On completion it fires `KC_FEAT_OVERVIEW`, mapped in
+`process_record_user` to `feature_overview_trigger()`.
 
-1. **QMK-native** (`COMBO_ENABLE`, `combos.c` `key_combos[]`) — keycode /
-   "software-key" combos. Reserved keys: `KC_O`, `KC_LBRC`.
-2. **Custom position combos** (`features.c` `features_combo_process`) —
-   matrix-position (`POS_KC_*`) or keycode matching. Reserved positions:
-   `POS_KC_O`, `POS_KC_LBRC`.
+Two combo systems, kept separate with compile-time reserved-key checks:
 
-Chord keys are held back (never registered) until they resolve — partner key →
-overview, release alone → single tap, `OV_CHORD_TERM_MS` elapse or another key
-interrupts → re-pressed normally. The open overview (and layer mode) is a true
-modal consumed in pre-process, so no keycode-based handler can swallow its keys.
+1. **Position combos** (`features.c`, `POS_COMBOS_DEFS`) — matrix-position
+   (`POS_KC_*`) or keycode matching; the overview entry lives here. Its keys
+   (`POS_KC_O`, `POS_KC_LBRC`) are reserved against other position combos.
+2. **QMK-native** (`COMBO_ENABLE`, `combos.c` `key_combos[]`) — keycode /
+   "software-key" combos; `KC_O`/`KC_LBRC` reserved (they belong to the
+   overview entry). Currently empty.
+
+Hold-back semantics are native-combo style: both keys are held back (never
+registered) until they resolve — partner arrives within `COMBO_TERM` → overview
+opens; a single key released alone → re-pressed as a tap; held past `COMBO_TERM`
+→ re-pressed as a held key. The open overview (and layer mode) is a true modal
+consumed in pre-process, so no keycode-based handler can swallow its keys.
+
+> **Divergence from upstream:** QMK-native combos can only match the *resolved
+> keycode* of a key, never its matrix position. Because the overview must open
+> on any layer (including blank ones), it uses a position-keyed combo instead
+> of a native keycode combo. See `DIVERGENCES.md` §4.x.
 
 ## Layer mode (pick layers only)
 

@@ -84,15 +84,21 @@ enum layers {
 // Auto-exit when the overview is left idle.  0 = never auto-exit.
 #define OVERVIEW_TIMEOUT_MS 10000
 
-// The overview opens by pressing O (1,9) and [ (1,11) TOGETHER.  The chord is
-// matched by PHYSICAL matrix position in pre_process_record_user — never by
-// keycode — so it works from any layer.  Its keys are reserved: a combo that
-// reuses them (keycode KC_O/KC_LBRC or positions) fails to compile (§7).
+// The overview opens by pressing O and [ TOGETHER.  It is a POSITION combo
+// (defined in §8 POS_COMBOS_DEFS): the keys are matched by PHYSICAL matrix
+// position (POS_KC_O = (1,9), POS_KC_LBRC = (1,11)) — never by keycode — so
+// it fires on ANY layer, including blank ones where the keys resolve to
+// nothing.  This is a deliberate divergence from QMK-native combos (which can
+// only match the resolved keycode); documented in DIVERGENCES.md §4.x.
 //
-// Chord keys are held back (nothing registered) until they resolve: partner →
-// overview opens; released alone → normal single key; this window elapses while
-// held, or another key interrupts → the key is re-pressed normally.
-#define OV_CHORD_TERM_MS 60     // ms window to complete the O+[ chord
+// The combo fires KC_FEAT_OVERVIEW, which the keymap's process_record_user()
+// maps to feature_overview_trigger().  COMBO_TERM (QMK default 50 ms) governs
+// the chord window; an incomplete single key is re-pressed so typing O / [
+// alone still works.
+
+// Custom keycode fired by the overview position combo (§8).  The keymap maps
+// it to feature_overview_trigger().
+enum { KC_FEAT_OVERVIEW = NEW_SAFE_RANGE };
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -213,9 +219,10 @@ typedef enum {
  * §8  COMBOS  —  position combos + the native-combo reserved-key guard
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-// Custom position combos (features.c), matching by matrix position or keycode,
-// independent of QMK-native combos and of the feature-overview chord.
-// The chord's keys are RESERVED — a combo reusing them fails to compile.
+// ── Custom position combos (features.c) ─────────────────────────────────────
+// Match by matrix position (BASE_IS_MATRIX, POS_KC_*) or keycode
+// (BASE_IS_KEYCODE).  Independent of QMK-native combos (combos.c).  These are
+// the ONLY combos that can match a physical key on any layer.
 
 typedef struct {
     uint8_t  key_count;   ///< number of keys in this combo (1-4)
@@ -227,21 +234,25 @@ typedef struct {
 #define POS_COMBO(count, type, out, ...) \
     { .key_count = (count), .base_type = (type), .keys = {__VA_ARGS__}, .output = (out) }
 
-// Compile-time guard: reject any position combo that reuses the overview chord.
+// Compile-time guard: these keys belong to the feature-overview entry below,
+// so no OTHER position combo may reuse them (duplicate enum member → error).
 #define CKPOS(p) POSCOMBO_KEYCHECK_##p
 enum pos_combo_reserved_check {
-    CKPOS(POS_KC_O),     // overview chord — reserved
-    CKPOS(POS_KC_LBRC),  // overview chord — reserved
-    // Register every key of each new position combo here too, e.g.:
+    CKPOS(POS_KC_O),     // feature-overview entry (below) — reserved
+    CKPOS(POS_KC_LBRC),  // feature-overview entry (below) — reserved
+    // Register every key of each new combo you add here too, e.g.:
     // CKPOS(POS_KC_Q), CKPOS(POS_KC_W),
     POSCOMBO_KEYCHECK_END,
 };
 #undef CKPOS
 
-// Runtime position-combo definitions (empty by default).  When you add one,
-// ALSO add its keys to pos_combo_reserved_check above.
+// ── Runtime position-combo definitions ──────────────────────────────────────
+// The FIRST entry is the feature-overview chord (O + [ by physical position,
+// §2).  Add more combos after it; also list their keys in the reserve enum
+// above.
 #define POS_COMBOS_DEFS \
-    /* POS_COMBO(2, BASE_IS_MATRIX, KC_X, POS_KC_Q, POS_KC_W), */
+    POS_COMBO(2, BASE_IS_MATRIX, KC_FEAT_OVERVIEW, POS_KC_O, POS_KC_LBRC),
+
 
 // (QMK-native keycode combos live in combos.c `key_combos[]`; their own guard
 //  there rejects KC_O / KC_LBRC the same way.)

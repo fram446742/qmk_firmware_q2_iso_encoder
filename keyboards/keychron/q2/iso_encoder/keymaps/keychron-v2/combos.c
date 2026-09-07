@@ -8,14 +8,13 @@
 // QMK-native combos  (keycode / "software-key" matching, process_combo)
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// Independent from BOTH the feature-overview chord AND the custom position
-// combos (features.c).  Native combos match the resolved keycode on the active
-// layer, so they only fire on layers where those keycodes exist.
-//
-// ⚠️  The feature-overview chord owns matrix (1,9)=O and (1,11)=[ by physical
-//     position (indicators.c pre_process).  KC_O and KC_LBRC are RESERVED: a
-//     native combo here that includes either fails to compile (duplicate enum
-//     member) so the two systems can never collide.
+// NOTE ON THE FEATURE-OVERVIEW CHORD: the overview is NOT opened by a native
+// combo.  It is opened by a POSITION combo (features.c features_combo_process,
+// POS_COMBOS_DEFS in keymap_config.h) whose keys are matched by PHYSICAL matrix
+// position (POS_KC_O / POS_KC_LBRC), so it fires on any layer — including blank
+// ones.  QMK-native combos here can only match the resolved keycode, so KC_O /
+// KC_LBRC are reserved for the overview and must not appear in a native combo
+// (compile-time check below).  See DIVERGENCES.md §4.x.
 //
 // To add a native combo:
 //   1. add its key array below (const uint16_t PROGMEM cb_<name>[] = {...}),
@@ -24,7 +23,8 @@
 
 #define CK(kc) COMBO_KEYCHECK_##kc
 enum combo_key_reserved_check {
-    // Reserved by the feature-overview chord — DO NOT reuse in a combo:
+    // Used by the feature-overview position combo — do NOT reuse in a native
+    // combo:
     CK(KC_O),
     CK(KC_LBRC),
     // Register every key of each new combo below, e.g.:
@@ -33,7 +33,7 @@ enum combo_key_reserved_check {
 };
 #undef CK
 
-// (No native combos defined yet — this array intentionally empty.)
+// (No native combos defined yet — add them per the instructions above.)
 combo_t key_combos[] = {
-    // [CB_EXAMPLE] = COMBO(cb_example, KC_X),
+    // [CB_X] = COMBO(cb_x, KC_Y),
 };

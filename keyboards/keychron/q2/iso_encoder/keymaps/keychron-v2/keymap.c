@@ -198,9 +198,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         if (!features_tap_process(keycode, record)) return false;
     }
 
-    // ── Position combos (custom) — separate from QMK-native (combos.c) and
-    // from the overview chord (pre_process).  Runs here, overview not open.
-    if (!features_combo_process(keycode, record)) return false;
+    // ── Feature-overview position combo fired → open the overview ───────
+    // KC_FEAT_OVERVIEW is produced by features_combo_process (run in
+    // pre_process) when O + [ complete by matrix position.
+    if (record->event.pressed) {
+        if (keycode == KC_FEAT_OVERVIEW) {
+            feature_overview_trigger();
+            return false;
+        }
+    }
 
     // ── RGB feedback: show RGB state for 1 second after RGB key press ──
     // Detects underglow, RGB matrix, backlight, and LED matrix keycodes.
@@ -262,7 +268,6 @@ void matrix_scan_user(void) {
     feature_overview_task();
     layer_picker_task();
     layer_visualizer_task();
-    feature_overview_chord_task();
     features_tap_task();
     features_combo_task();
 

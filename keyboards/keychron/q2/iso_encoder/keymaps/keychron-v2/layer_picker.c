@@ -2,12 +2,13 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include QMK_KEYBOARD_H
+#include "keychron_common.h"  // NEW_SAFE_RANGE — must precede keymap_config.h
 #include "keymap_config.h"
 #include "layer_picker.h"
 #include "feature_overview.h" // feature_overview_is_active()/encoder()
+#include "features.h"         // features_combo_clear()
 #include "indicators.h"       // layer_to_led()
 #include "layer_visualizer.h" // overlay_clear_all()/overlay_set_color()
-#include "keychron_common.h"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // State
@@ -47,6 +48,7 @@ static void picker_enter(void) {
     saved_rgb_mode  = rgb_matrix_config.mode;
     saved_rgb_on    = rgb_matrix_config.enable;
     layer_visualizer_cancel();            // pause any layer-viz overlay
+    features_combo_clear();               // modal will eat combo-key releases
     rgb_matrix_config.enable = 1;         // force the overlay render path
     picker_active = true;
     picker_start  = timer_read32();

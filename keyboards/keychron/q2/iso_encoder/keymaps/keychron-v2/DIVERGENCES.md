@@ -61,6 +61,20 @@ quantum/rgb_matrix/rgb_matrix.c                          ← RGB core (modified 
 | `gen_key_positions.py` | Generator for `key_positions.h` |
 | `qmk_config_tool.py` | Export/import/dump feature config over USB Raw HID |
 
+**Divergence — feature-overview entry is a position-keyed combo.** Upstream QMK
+combos (`key_combos[]` / `process_combo`) match a key by its *resolved keycode*
+only; there is no native "match physical key" path, so a native combo cannot
+fire on a layer where that position isn't that keycode. The feature overview
+must open from any layer — including isolated blank layers (`_FN3.._FN6` after a
+`layer_move`, where the keys resolve to nothing) — so its `O + [` chord is
+implemented as a **position combo** (matrix `POS_KC_O`/`POS_KC_LBRC`) in the
+custom processor `features_combo_process()` (features.c), running in
+`pre_process_record_user` ahead of any keycode-based handler. It fires
+`KC_FEAT_OVERVIEW` (features.c → keymap.c), which opens the overview. Hold-back,
+single-key replay and hold semantics mirror QMK-native combos. The overview
+keys are reserved (compile-time checks) so no other position or native combo
+reuses them. This is an accepted, minimal divergence.
+
 ### 4.2 Keyboard-level — `keyboards/keychron/q2/`
 
 | File | Status vs vendor | What differs |

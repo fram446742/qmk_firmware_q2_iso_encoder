@@ -51,6 +51,9 @@ void features_tap_task(void);
 // ── Position combos (custom, features.c) — independent of QMK-native combos ──
 bool features_combo_process(uint16_t keycode, keyrecord_t *record);
 void features_combo_task(void);
+/// Drop all combo tracking (call when a modal screen opens — it consumes the
+/// releases, so stale down/fired/live state must not survive).
+void features_combo_clear(void);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // EEPROM-backed config arrays  (extern declarations)

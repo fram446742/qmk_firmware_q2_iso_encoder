@@ -20,22 +20,20 @@ typedef struct keyrecord_t keyrecord_t;
 // keymap_config.h OVERLAY ROLE COLORS).
 //
 // Hook pattern (shared by layer_picker / layer_visualizer):
-//   pre_process (modal + entry)   → feature_overview_pre_process()
-//   matrix_scan poll              → feature_overview_chord_task() / _task()
-//   rgb frame draw                → feature_overview_draw()
+//   pre_process (modal + position-combo entry) → feature_overview_pre_process()
+//   matrix_scan poll                          → feature_overview_task()
+//   rgb frame draw                            → feature_overview_draw()
 
 void feature_overview_trigger(void);
 bool feature_overview_is_active(void);
 void feature_overview_cancel(void);
 void feature_overview_reset_timer(void);
 
-/// Overview modal + O+[ entry chord, by PHYSICAL position.  Call from
-/// pre_process_record_user (before any keycode-based handler).  Returns
-/// false when the event was consumed (overview open, or chord held back).
+/// Overview modal + position-combo entry (O + [ by matrix position).  Call
+/// from pre_process_record_user (before any keycode-based handler).  Returns
+/// false when the event was consumed (overview open, or a position-combo key
+/// held back / completed).
 bool feature_overview_pre_process(uint16_t keycode, keyrecord_t *record);
-
-/// Poll (matrix_scan): resolve a chord key held past OV_CHORD_TERM_MS alone.
-void feature_overview_chord_task(void);
 
 /// Poll (matrix_scan): overview idle timeout (0 / vis-lock = stay open).
 void feature_overview_task(void);
