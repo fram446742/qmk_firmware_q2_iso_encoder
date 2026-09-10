@@ -21,12 +21,15 @@ keyboard/vendor updates untouched.
 
 | Tree | Path | Branch / HEAD | Role |
 |---|---|---|---|
-| **This port** | `/home/franc/qmk_firmware` | `keychron-port-v2` @ `479f4ddfb4` | Upstream QMK + Keychron port + custom keymap |
-| **Vendor fork** | `/home/franc/qmk_firmware_keychron` | `2025q3` @ `ee7390c3bb` | Original Keychron firmware (source of truth for `keyboards/keychron/common/`) |
-| **Upstream QMK** | `/home/franc/qmk_firmware_original` | `master` @ `3f26a9232a` | Stock QMK (source of truth for `quantum/`, `drivers/`, etc.) |
+| **This port** | `/home/franc/qmk_firmware` | `keychron-port-v2-clean` (current checkout) | Upstream QMK + Keychron port + custom keymap |
+| **Vendor fork** | `/home/franc/qmk_firmware_keychron` | `2025q3` @ `9ada9b7bae` | Original Keychron firmware (source of truth for `keyboards/keychron/common/`) |
+| **Upstream QMK** | `/home/franc/qmk_firmware_original` | `master` @ `08c662f286` | Stock QMK (source of truth for `quantum/`, `drivers/`, etc.) |
 
 `origin` = `qmk/qmk_firmware` (upstream), `fork` = `fram446742/qmk_firmware_q2_iso_encoder`.
-The port tracks `origin/master` with 0 divergence on core; the Keychron additions sit on top.
+The port tracks `origin/master` with 0 divergence on core (merged `08c662f286` on
+2026-09-10); the Keychron additions sit on top. Vendor sync on the same date pulled
+`2025q3` from `ee7390c3bb` to `9ada9b7bae` (snap-click FIRST_KEY/SECOND_KEY release
+fix; the other new commit adds the vendor-only C100 8K board, not ported).
 
 ## 3. Where each thing lives
 
