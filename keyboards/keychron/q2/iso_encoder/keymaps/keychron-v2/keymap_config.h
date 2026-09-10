@@ -161,6 +161,8 @@ enum { KC_FEAT_OVERVIEW = NEW_SAFE_RANGE };
 #define IND_FEATURE_ON     {255, 255, 255}  ///< a feature toggle that is ON (white)
 #define IND_FEATURE_OFF    {255, 0, 0}      ///< a feature toggle that is OFF (red)
 #define IND_CAPS_LOCK_ON   {255, 255, 255}  ///< caps-lock drawn over the overlay
+#define IND_WIN_LOCK_ON    {255, 0, 0}      ///< Win Lock (no GUI) active — red
+#define IND_WIN_LOCK_OFF   {0, 255, 0}      ///< Win Lock released — green
 
 
 /* ═══════════════════════════════════════════════════════════════════════════

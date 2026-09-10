@@ -205,18 +205,26 @@ Toggle with `S` in overview; edit `typos.txt` and rebuild to change.
 
 ## Indicators (Caps / Num / Win Lock)
 
-Three status LEDs drawn through Keychron's proprietary `os_state_indicate()` path, so
-they appear as toggles in the **Keychron Launcher**:
+Status LEDs drawn by this keymap's `indicators.c`, so they stay correct while an RGB
+effect or an overlay screen is running (the vendor's `os_state_indicate()` path only
+draws when no effect is active):
 
-| Indicator | Physical key | LED | Launcher toggle |
+| Indicator | Physical key | LED | Behaviour |
 |---|---|---|---|
-| Caps Lock | Caps | 28 | Caps Lock |
-| Win Lock | Left Option (Win) | 58 | Win Lock (`no_gui`) |
+| Caps Lock | Caps | 28 | white while Caps Lock is on (effect buffer) |
+| Win Lock | Left Option (Win) | 58 | **red** while `keymap_config.no_gui` is set, **green** otherwise |
 
 Enabled by `#define`s in the keymap `config.h` (`WINLOCK_LED_LIST`); caps lock stays
 in the keyboard `config.h` matching the vendor. The Num Lock indicator is disabled
-(`NUM_LOCK_INDEX` commented out — no numpad on the Q2). Win Lock lights red
-only while the Win key is **locked**, not merely while Windows is the active OS mode.
+(`NUM_LOCK_INDEX` commented out — no numpad on the Q2). Win Lock colours come from
+`keymap_config.h` §5 (`IND_WIN_LOCK_ON` / `IND_WIN_LOCK_OFF`), and the LED is
+repainted last into the overlay buffer so the layer-visualization/overview screens
+can't hide the lock state.
+
+Why the vendor path can't do it here: `rgb/keychron_rgb.c:os_state_indicate()` wraps
+its whole `WINLOCK_LED_LIST` block in `#ifdef WIN_BASE_LAYER` — a macro this port
+never defines — and only draws while no RGB effect is running. Without the keymap
+code the LED simply shows the effect's colour (green), never the lock state.
 
 Known vendor bug (not fixed here): `keychron_rgb.c:os_state_indicate()` checks
 `.compose` instead of `.scroll_lock` for `SCROLL_LOCK_INDEX` — any future

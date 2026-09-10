@@ -299,23 +299,28 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // overlay deactivation clear.
     layer_visualizer_frame();
 
+    bool overlay = false;
+
     // ── Modal screens own the whole board ──────────────────────────────
     if (feature_overview_is_active()) {
         feature_overview_draw();
-        return true;
-    }
-    if (layer_picker_is_active()) {
+        overlay = true;
+    } else if (layer_picker_is_active()) {
         layer_picker_draw();
-        return true;
+        overlay = true;
+    } else {
+        // ── Normal state ───────────────────────────────────────────────
+        indicator_draw(led_min, led_max);  // caps-lock + Win Lock (effect buffer)
+
+        if (layer_visualizer_is_active()) {
+            layer_visualizer_draw();
+            overlay = true;
+        }
     }
 
-    // ── Normal state ───────────────────────────────────────────────────
-    indicator_draw(led_min, led_max);  // caps-lock into the effect buffer
-
-    if (layer_visualizer_is_active()) {
-        layer_visualizer_draw();
-        return true;
-    }
+    // Drawn last, into the overlay buffer: the screens above repaint every LED,
+    // so the Win Lock state would vanish while they are up.
+    if (overlay) indicator_draw_overlay();
 
     return true;
 }

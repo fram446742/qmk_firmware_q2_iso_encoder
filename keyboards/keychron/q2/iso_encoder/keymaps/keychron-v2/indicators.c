@@ -6,6 +6,7 @@
 #include "indicators.h"
 #include "keymap_config.h"
 #include "keychron_rgb_type.h"
+#include "layer_visualizer.h"  // overlay_set_color()
 
 // Launcher indicator config (disable flags + HSV).  Defined in the vendor's
 // keychron_rgb.c; referenced here for the caps-lock toggle.
@@ -50,6 +51,29 @@ static void caps_lock_indicate(uint8_t led_min, uint8_t led_max) {
 }
 #endif
 
+#if defined(RGB_MATRIX_ENABLE) && defined(WINLOCK_LED_LIST)
+// Win Lock (keymap_config.no_gui, toggled by FN2+Win → QK_MAGIC_TOGGLE_GUI):
+// red while locked, green while released.  The vendor's os_state_indicate()
+// cannot light it here: its WINLOCK block sits inside `#ifdef WIN_BASE_LAYER`
+// (never defined by this port) and it only draws when no RGB effect is
+// running, so the LED would otherwise just show the effect's color.
+static const uint8_t COL_WIN_LOCK_ON[3]  = IND_WIN_LOCK_ON;
+static const uint8_t COL_WIN_LOCK_OFF[3] = IND_WIN_LOCK_OFF;
+
+static const uint8_t *win_lock_color(void) {
+    return keymap_config.no_gui ? COL_WIN_LOCK_ON : COL_WIN_LOCK_OFF;
+}
+
+// pwm_buffer (effect) variant — used while no overlay screen is showing.
+static void win_lock_indicate(uint8_t led_min, uint8_t led_max) {
+    const uint8_t *c        = win_lock_color();
+    uint8_t        idx_list[] = WINLOCK_LED_LIST;
+    for (uint8_t i = 0; i < sizeof(idx_list); i++) {
+        RGB_MATRIX_INDICATOR_SET_COLOR(idx_list[i], c[0], c[1], c[2]);
+    }
+}
+#endif
+
 void indicator_draw(uint8_t led_min, uint8_t led_max) {
     // Caps/Num/Win Lock are drawn by os_state_indicate() in keychron_rgb.c;
     // this callback only draws the persistent caps-lock override.
@@ -57,5 +81,21 @@ void indicator_draw(uint8_t led_min, uint8_t led_max) {
 
 #if defined(RGB_MATRIX_ENABLE) && defined(CAPS_LOCK_INDEX)
     caps_lock_indicate(led_min, led_max);
+#endif
+#if defined(RGB_MATRIX_ENABLE) && defined(WINLOCK_LED_LIST)
+    win_lock_indicate(led_min, led_max);
+#endif
+}
+
+void indicator_draw_overlay(void) {
+#if defined(RGB_MATRIX_ENABLE) && defined(WINLOCK_LED_LIST)
+    // Same Win Lock state, but into the overlay buffer: the overlay screens
+    // (visualization, overview, layer mode) repaint every LED, so this has to
+    // be drawn after them or the lock state disappears while they're up.
+    const uint8_t *c        = win_lock_color();
+    uint8_t        idx_list[] = WINLOCK_LED_LIST;
+    for (uint8_t i = 0; i < sizeof(idx_list); i++) {
+        overlay_set_color(idx_list[i], c[0], c[1], c[2]);
+    }
 #endif
 }

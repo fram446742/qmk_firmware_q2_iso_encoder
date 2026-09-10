@@ -23,3 +23,8 @@ uint8_t indicator_led_for_layer(void);
 /// Draw the normal-state caps-lock LED into the effect's pwm_buffer.
 /// Call from rgb_matrix_indicators_advanced_user when no modal screen is open.
 void indicator_draw(uint8_t led_min, uint8_t led_max);
+
+/// Draw the indicators that must stay visible on top of an overlay screen
+/// (the Win Lock LED) into the overlay buffer.  Call AFTER the active
+/// screen's *_draw(), otherwise the screen repaints over it.
+void indicator_draw_overlay(void);
