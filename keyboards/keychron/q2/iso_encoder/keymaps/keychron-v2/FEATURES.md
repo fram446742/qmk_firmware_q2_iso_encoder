@@ -212,19 +212,23 @@ draws when no effect is active):
 | Indicator | Physical key | LED | Behaviour |
 |---|---|---|---|
 | Caps Lock | Caps | 28 | white while Caps Lock is on (effect buffer) |
-| Win Lock | Left Option (Win) | 58 | **red** while `keymap_config.no_gui` is set, **green** otherwise |
+| Win Lock | Left Option (Win) | 58 | **red** while `keymap_config.no_gui` is set — in every state; **green** only while an overlay screen is showing; otherwise untouched, so it keeps the RGB effect's colour |
 
 Enabled by `#define`s in the keymap `config.h` (`WINLOCK_LED_LIST`); caps lock stays
 in the keyboard `config.h` matching the vendor. The Num Lock indicator is disabled
 (`NUM_LOCK_INDEX` commented out — no numpad on the Q2). Win Lock colours come from
-`keymap_config.h` §5 (`IND_WIN_LOCK_ON` / `IND_WIN_LOCK_OFF`), and the LED is
-repainted last into the overlay buffer so the layer-visualization/overview screens
-can't hide the lock state.
+`keymap_config.h` §5 (`IND_WIN_LOCK_ON` / `IND_WIN_LOCK_OFF`).
+
+The asymmetry is deliberate: an idle lock says nothing, so with an effect running the
+key keeps the effect's colour and only the *locked* state paints red over it. When an
+overlay screen (layer visualization, overview, layer mode) owns the board it repaints
+every LED, so there the released state is drawn green too — that is the only place the
+green appears.
 
 Why the vendor path can't do it here: `rgb/keychron_rgb.c:os_state_indicate()` wraps
 its whole `WINLOCK_LED_LIST` block in `#ifdef WIN_BASE_LAYER` — a macro this port
 never defines — and only draws while no RGB effect is running. Without the keymap
-code the LED simply shows the effect's colour (green), never the lock state.
+code the LED simply shows the effect's colour and never the lock state.
 
 Known vendor bug (not fixed here): `keychron_rgb.c:os_state_indicate()` checks
 `.compose` instead of `.scroll_lock` for `SCROLL_LOCK_INDEX` — any future
