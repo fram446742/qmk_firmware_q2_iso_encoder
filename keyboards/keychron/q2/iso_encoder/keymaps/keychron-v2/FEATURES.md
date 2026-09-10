@@ -21,6 +21,7 @@ proprietary Raw-HID channel. **All of that is preserved.** Everything below is n
 | **Layer visualization** (color-coded key categories) | any layer change / hold `MO` | ON |
 | **Runtime feature flags** | toggled inside overview | mixed (see flags) |
 | **Tap dance** (double-tap = action, transparent override) | config in `keymap_config.h` | OFF |
+| **Esc key: modifier passthrough** (es-ES: AltGr → `\`, Win → `º`) | hold `AltGr` / `Win` + `Esc` | ON |
 | **Auto-correct** | compile-time trie from `typos.txt` | OFF |
 | **Leader key** (platform-aware shortcuts) | `FN2 + Q`, then a key | OFF |
 | **Caps Word / Repeat Key / Dynamic Macro / Auto-Shift** | QMK features wired into the flag system | CW+REP ON, rest OFF |
@@ -96,6 +97,46 @@ Intercepts keys before QMK. Entries match by **keycode** or **matrix position**
 input enabled (Windows `EnableHexNumpad`, Linux IBus, macOS Unicode Hex Input).
 Without it the chords are read as Alt/Ctrl shortcuts.
 
+## Esc key on non-US layouts (modifier → layout character level)
+
+`QK_GESC` is US-centric: it sends `KC_ESCAPE` unless Shift/GUI is held, and when
+it sends `KC_GRAVE` it sends it **together with** the held modifiers. On an es-ES
+system (the physical Esc key is the ordinals key, `0x35`) both variants miss:
+
+| Held | QMK sends | Host sees | Result on Windows/es-ES |
+|---|---|---|---|
+| — | `KC_ESCAPE` | Esc | works |
+| `Shift` | `KC_GRAVE`+Shift | Shift+`0x35` | `ª` (layout level 2) |
+| AltGr (`RAlt`) | `KC_ESCAPE` | `RAlt+Esc` | **Alt+Esc window-switch hotkey** |
+| `Win`/Cmd | `KC_GRAVE`+GUI | `Win+0x35` | **nothing** — shell eats Win+key |
+
+The GUI case is [QMK issue #3769](https://github.com/qmk/qmk_firmware/issues/3769)
+(“it sends GUI+Grave, which doesn't print the character”), never fixed upstream.
+
+`features_gesc_process()` (`features.c`, wired into `pre_process_record_user`)
+replaces both with a plain `KC_GRV` (HID `0x35`) and lets the **OS layout** pick
+the character, using the masks in `keymap_config.h` §14:
+
+* `GESC_ALTGR_MODS` (`MOD_BIT(KC_RALT)`) — AltGr **stays** in the report, since
+  the layout needs it to reach level 3 → `\` (Windows `KBDSP` and XKB `es` both
+  map AltGr + the ordinals key to backslash). No Escape keycode reaches the
+  host, so Alt+Esc cannot fire.
+* `GESC_STRIP_MODS` (`MOD_MASK_GUI`) — GUI is **hidden** from that one report
+  (`del_mods()` without sending) → the layout emits level 1, `º`. Without this,
+  Windows keeps treating it as a Win shortcut.
+
+Caveats of the GUI path: the host now believes Win was released, so it stays
+“up” until you physically re-press it (that is what keeps the Start menu from
+opening on release); on macOS `Cmd+Esc` therefore no longer cycles windows
+(`Cmd+`` ` `` is a system shortcut there). Set `GESC_STRIP_MODS` to `0` to
+disable.
+
+The release is matched via a flag, not the live modifier state, so letting a
+modifier go first can't leak a stray Escape key-up.
+
+Unchanged: plain `Esc`; `Shift+Esc` → `ª`; `Ctrl` / `Ctrl+Shift` pass through to
+QMK (Start menu / Task Manager); `LAlt+Esc` is still the native Alt+Esc.
+
 ## Feature-overview entry & combos
 
 The overview chord `O + [` is a **POSITION combo**: it is matched by PHYSICAL
@@ -120,8 +161,10 @@ Two combo systems, kept separate with compile-time reserved-key checks:
 Hold-back semantics are native-combo style: both keys are held back (never
 registered) until they resolve — partner arrives within `COMBO_TERM` → overview
 opens; a single key released alone → re-pressed as a tap; held past `COMBO_TERM`
-→ re-pressed as a held key. The open overview (and layer mode) is a true modal
-consumed in pre-process, so no keycode-based handler can swallow its keys.
+→ re-pressed as a held key; **any other key pressed first → the held member
+commits immediately** (so fast typing keeps its order — `on` never becomes `no`).
+The open overview (and layer mode) is a true modal consumed in pre-process, so
+no keycode-based handler can swallow its keys.
 
 > **Divergence from upstream:** QMK-native combos can only match the *resolved
 > keycode* of a key, never its matrix position. Because the overview must open

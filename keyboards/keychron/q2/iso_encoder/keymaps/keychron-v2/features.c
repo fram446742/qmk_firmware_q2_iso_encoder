@@ -164,6 +164,61 @@ void features_tap_task(void) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Esc key — modifier handling  (GESC_ALTGR_MODS / GESC_STRIP_MODS, §14)
+// ═════════════════════════════════════════════════════════════════════════════
+// QK_GESC is US-centric: it sends KC_ESCAPE unless Shift/GUI is held, and when
+// it does send KC_GRAVE it sends it *together with* the held modifiers.  Both
+// modifiers hold the character back on an es-ES layout:
+//
+//   * AltGr (RAlt) — QMK sends KC_ESCAPE, so the host saw RAlt+Esc; on Windows
+//     Alt+Esc is the window-switch hotkey and nothing is typed.
+//   * GUI (Win/Cmd) — the host saw GUI+KC_GRAVE and Windows consumes Win+<key>
+//     as a shell shortcut (same reason Win+E types no 'e'), so no character
+//     appears.  This is QMK issue #3769, never fixed upstream.
+//
+// Both cases become a plain KC_GRV (HID 0x35) and the OS layout supplies the
+// character: AltGr + 0x35 = `\` on es-ES (level 3), plain 0x35 = `º`
+// (level 1).  The modifier handling differs, though:
+//   * AltGr must STAY in the report — the layout needs it to reach level 3.
+//   * GUI must be HIDDEN from the report (del_mods without sending, so only the
+//     keystroke's own report is affected) — otherwise Windows still sees it as
+//     a Win shortcut.  It is not restored; see the caveat below.
+//
+// The release is consumed too, matched via the flag rather than the live
+// modifier state, so letting a modifier go first can't leak a stray Escape.
+
+typedef enum { GESC_NONE = 0, GESC_ALTGR, GESC_GUI } gesc_mode_t;
+
+static gesc_mode_t gesc_mode = GESC_NONE;
+
+bool features_gesc_process(uint16_t keycode, keyrecord_t *record) {
+    if (keycode != QK_GESC) return true;
+
+    if (record->event.pressed) {
+        uint8_t mods = get_mods();
+
+        if (mods & GESC_ALTGR_MODS) {
+            gesc_mode = GESC_ALTGR;
+            register_code(KC_GRV);  // report keeps AltGr → layout emits level 3
+            return false;
+        }
+        if (mods & GESC_STRIP_MODS) {
+            gesc_mode = GESC_GUI;
+            del_mods(GESC_STRIP_MODS);  // no report sent: hides GUI from the next one only
+            register_code(KC_GRV);      // report: no GUI + 0x35 → layout emits level 1
+            return false;
+        }
+        return true;
+    }
+
+    if (gesc_mode == GESC_NONE) return true;
+    gesc_mode = GESC_NONE;
+    unregister_code(KC_GRV);
+    return false;
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Position combo processor  (custom — matrix-position and keycode combos)
 // ═════════════════════════════════════════════════════════════════════════════
 // Independent of QMK-native combos (key_combos[] in combos.c) and of the
@@ -195,6 +250,20 @@ static uint16_t combo_member_kc(const pos_combo_def_t *cb, uint8_t ki) {
         return (kc == KC_TRNS) ? KC_NO : kc;
     }
     return cb->keys[ki];
+}
+
+/// Register a held-back member as a live held key (down), now that its chord
+/// can no longer form.  Output must go out immediately — if it waited for the
+/// member's release, a following key pressed in the meantime would type first
+/// and fast rolls would transpose ("on" → "no", "om" → "mo").  The member's
+/// real release lifts it via the `live` bookkeeping.
+static void combo_commit_member(uint8_t ci, uint8_t ki, uint8_t bit) {
+    uint16_t kc = combo_member_kc(&pos_combos[ci], ki);
+    if (kc == KC_NO || kc == KC_TRNS) return;
+    register_code16(kc);
+    pos_cb_state[ci].live |= bit;
+    pos_cb_state[ci].live_kc[ki] = kc;
+    pos_cb_state[ci].down &= ~bit;
 }
 
 bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
@@ -253,6 +322,22 @@ bool features_combo_process(uint16_t keycode, keyrecord_t *record) {
             return false; // consumed; we owned this member
         }
     }
+    // Not a member of any combo.  If a member of a pending chord is still
+    // held back (down, not yet fired), that chord can no longer form — an
+    // unrelated key means the partner was never the next key.  Commit the
+    // held member(s) NOW, before this key types, so a fast roll keeps its
+    // order ("on" stays "on", never "no").  Mirrors QMK-native combos, which
+    // dump buffered single keys when an unrelated key breaks the chord.
+    if (record->event.pressed) {
+        for (uint8_t ci = 0; ci < POS_COMBO_COUNT; ci++) {
+            if (pos_cb_state[ci].fired || pos_cb_state[ci].down == 0) continue;
+            for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
+                uint8_t bit = (1 << ki);
+                if (pos_cb_state[ci].down & bit) combo_commit_member(ci, ki, bit);
+            }
+            if (pos_cb_state[ci].down == 0) pos_cb_state[ci].timer = 0;
+        }
+    }
     return true; // not handled
 }
 
@@ -278,13 +363,7 @@ void features_combo_task(void) {
         if (timer_elapsed(pos_cb_state[ci].timer) <= COMBO_TERM) continue;
         for (uint8_t ki = 0; ki < pos_combos[ci].key_count; ki++) {
             uint8_t bit = (1 << ki);
-            if (!(pos_cb_state[ci].down & bit)) continue;
-            uint16_t kc = combo_member_kc(&pos_combos[ci], ki);
-            if (kc == KC_NO || kc == KC_TRNS) continue;
-            register_code16(kc);
-            pos_cb_state[ci].live |= bit;
-            pos_cb_state[ci].live_kc[ki] = kc;
-            pos_cb_state[ci].down &= ~bit;
+            if (pos_cb_state[ci].down & bit) combo_commit_member(ci, ki, bit);
         }
         if (pos_cb_state[ci].down == 0) pos_cb_state[ci].timer = 0;
     }

@@ -48,6 +48,12 @@ typedef struct keyrecord_t keyrecord_t;
 bool features_tap_process(uint16_t keycode, keyrecord_t *record);
 void features_tap_task(void);
 
+// ── Esc-key modifier handling (GESC_*_MODS in keymap_config.h §14) ────────────
+/// Emits KC_GRV instead of QK_GESC's Escape/grave-plus-modifier so the host
+/// layout produces the modifier's character level (es-ES: AltGr → `\`,
+/// GUI → `º`).  hook: pre_process.
+bool features_gesc_process(uint16_t keycode, keyrecord_t *record);
+
 // ── Position combos (custom, features.c) — independent of QMK-native combos ──
 bool features_combo_process(uint16_t keycode, keyrecord_t *record);
 void features_combo_task(void);

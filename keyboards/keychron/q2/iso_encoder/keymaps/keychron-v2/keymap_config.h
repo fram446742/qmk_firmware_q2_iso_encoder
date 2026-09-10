@@ -13,23 +13,25 @@
  *    § 2  Feature overview             (O + [ screen: entry, timeout)
  *    § 3  Layer mode / picker          (knob-hold screen: hold/timeout)
  *    § 4  Layer visualization          (key-category overlay colors + timing)
- *    § 5  Tap overrides                (double-tap: types, timing, defaults)
- *    § 6  Leader key                   (modifier auto-select)
- *    § 7  Combos                       (position combos + native-combo guard)
- *    § 8  Runtime feature flags        (the 7 EEPROM on/off bits)
- *    § 9  EEPROM layout                (structs + addresses)
- *    §10  HID protocol VALUE ids       (shared with qmk_config_tool.py)
- *    §11  Indicator LED indices        (which physical LED lights what)
- *    §12  Boot-time defines (config.h) (VIA limits, lock LEDs — include order)
+ *    § 5  Overlay role colors          (LED colors shared by the screens)
+ *    § 6  Tap overrides                (double-tap: types, timing, defaults)
+ *    § 7  Leader key                   (modifier auto-select)
+ *    § 8  Combos                       (position combos + native-combo guard)
+ *    § 9  Runtime feature flags        (the 7 EEPROM on/off bits)
+ *    §10  EEPROM layout                (structs + addresses)
+ *    §11  HID protocol VALUE ids       (shared with qmk_config_tool.py)
+ *    §12  Indicator LED indices        (which physical LED lights what)
+ *    §13  Boot-time defines (config.h) (VIA limits, lock LEDs — include order)
+ *    §14  Esc key / wildcard modifiers  (modifier → layout character level)
  *
  *  ══  INCLUDE ORDER  ══════════════════════════════════════════════════════
  *  Include this AFTER QMK_KEYBOARD_H + keychron_common.h (needs KC_* keycodes,
  *  COMBO_END, NEW_SAFE_RANGE, …).  Do NOT include it from config.h — that file
- *  is processed before the QMK headers are available (see §12).
+ *  is processed before the QMK headers are available (see §13).
  *
  *  The Python tool (qmk_config_tool.py) parses this file for the HID protocol
  *  constants (VALUE_*, EEP_*, the EEPROM structs, and the *_DEFAULTS lists),
- *  so do not rename or renumber anything in §9–§10.
+ *  so do not rename or renumber anything in §10–§11.
  */
 
 #pragma once
@@ -385,3 +387,32 @@ typedef struct __attribute__((packed)) {
 // keyboards/keychron/q2/iso_encoder/keymaps/keychron-v2/config.h because that
 // file is compiled BEFORE the QMK headers exist (they must override VIA's
 // defaults before QMK_KEYBOARD_H is seen).  Everything else is here.
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §14  ESC KEY  —  modifier passthrough on non-US layouts
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+// QK_GESC only knows two outputs: KC_ESCAPE (no modifier) and KC_GRAVE
+// (Shift/GUI held) — and it always sends them *with* the held modifiers.  Both
+// are wrong on an es-ES layout, so features_gesc_process() (features.c)
+// intercepts QK_GESC and emits a plain KC_GRV (HID 0x35) instead; the OS layout
+// supplies the character.
+//
+//   GESC_ALTGR_MODS — AltGr held.  QMK would send KC_ESCAPE, i.e. RAlt+Esc,
+//     the Windows Alt+Esc window-switch hotkey.  Emitting 0x35 *with* AltGr
+//     left in the report gives the key's level-3 character: `\` on es-ES
+//     (Windows KBDSP and XKB es both map AltGr + the ordinals key to
+//     backslash).
+//
+//   GESC_STRIP_MODS — GUI held.  QMK sends KC_GRAVE + GUI, which Windows
+//     swallows as a Win shortcut (Win+E types no 'e' either; QMK issue #3769).
+//     Emitting 0x35 with GUI hidden from that report lets the layout produce
+//     the level-1 character: `º`.  Caveat: the host now believes Win was
+//     released, so it stays "up" until you physically re-press it (this is
+//     what avoids the Start menu opening on release), and on macOS
+//     Cmd+Esc no longer cycles windows.  Set GESC_STRIP_MODS to 0 to disable.
+//
+// (MOD_MASK_RALT doesn't exist in this QMK tree — use the single-mod bit.)
+#define GESC_ALTGR_MODS MOD_BIT(KC_RALT)
+#define GESC_STRIP_MODS MOD_MASK_GUI

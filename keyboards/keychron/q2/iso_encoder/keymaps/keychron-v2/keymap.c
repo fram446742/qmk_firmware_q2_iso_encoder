@@ -115,7 +115,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [_FN2] = LAYOUT_iso_68(
         KC_TILD,  KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,   KC_F12,   _______,            _______,
-        QK_LEAD,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      KC_INS,
+        _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,                      KC_INS,
         _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            KC_PSCR,
         _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,            _______,  KC_PGUP,
         _______,  QK_MAGIC_TOGGLE_GUI,  _______,                                _______,                                _______,  _______,  _______,  KC_HOME,  KC_PGDN,  KC_END),
@@ -189,7 +189,11 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     // regardless of what those positions resolve to.  Layer-picker runs first
     // (knob long-press), then the feature-overview chord/modal.
     if (!layer_picker_pre_process(keycode, record)) return false;
-    return feature_overview_pre_process(keycode, record);
+    if (!feature_overview_pre_process(keycode, record)) return false;
+
+    // Esc key: AltGr → level-3 char (`\` on es-ES) instead of RAlt+Esc
+    // (keymap_config.h §14; features_gesc_process in features.c).
+    return features_gesc_process(keycode, record);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
